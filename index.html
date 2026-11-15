@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Counselors for Change — Connecting Portal</title>
-<meta name="description" content="Counselors for Change connects licensed therapists, counselors and psychologists with schools and organizations for panels, workshops and psychoeducation.">
+<title>Connections 4 Change · Counselors for Change</title>
+<meta name="description" content="Connections 4 Change, by Counselors for Change, connects licensed therapists, counselors and psychologists with schools and organizations for panels, workshops and psychoeducation.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%230E7BAE' d='M48 12 L68 12 L38 51 L18 51 Z'/%3E%3Cpath fill='%230E7BAE' d='M53 30 L73 30 L73 93 L53 93 Z'/%3E%3Cpath fill='%2323B2BB' d='M10 51 L68 51 L68 42 L92 63 L68 84 L68 73 L10 73 Z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,900;1,600;1,700;1,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,9 +22,9 @@
 
 <nav class="nav" aria-label="Main">
   <div class="nav-top">
-    <a href="#home" class="brand" data-tab="home" aria-label="Counselors for Change home">
+    <a href="#home" class="brand" data-tab="home" aria-label="Connections 4 Change home">
       <span class="nav-mark" aria-hidden="true"><svg><use href="#four-mark"/></svg></span>
-      <span class="wordmark">Counselors for Change<small>Connecting Portal</small></span>
+      <span class="wordmark">Connections 4 Change<small>by Counselors for Change</small></span>
     </a>
   </div>
   <div class="nav-bottom">
@@ -51,7 +51,7 @@
       <div>
         <div class="eyebrow">Licensed therapists · Counselors · Psychologists</div>
         <h1>Counselors ready.<br>Communities waiting.<br><em>Let's connect them.</em></h1>
-        <p class="lead">Counselors for Change connects licensed mental health professionals with schools, nonprofits and workplaces looking for panelists, workshop facilitators and psychoeducation speakers, matched by expertise, audience and availability.</p>
+        <p class="lead">Connections 4 Change is a Counselors for Change initiative. It connects verified, licensed mental health professionals with schools and community organizations looking for panelists, workshop facilitators and psychoeducation speakers. You browse, choose and connect directly.</p>
         <div class="cta-row">
           <button class="btn btn-primary" data-tab="join">I'm a counselor</button>
           <button class="btn btn-outline" data-tab="request">I'm a school or organization</button>
@@ -138,11 +138,28 @@
         <div class="field"><span class="label">General availability <span class="field-flag pub">Public</span></span><div class="chipset" id="volAvailability" data-options="AVAILABILITY"></div><div class="hint">Organizations propose specific times inside these windows.</div></div>
         <div class="row2">
           <div class="field"><label for="volTimezone">Your timezone <span class="field-flag priv">Private</span></label><select id="volTimezone" class="tz-select"></select></div>
-          <div class="field"><label for="volLeadTime">Minimum days' notice <span class="field-flag priv">Private</span></label><input type="number" id="volLeadTime" min="1" max="90" value="14"></div>
+          <div class="field"><label for="volLeadTime">Minimum days' notice <span class="field-flag priv">Private</span></label><input type="number" id="volLeadTime" min="1" max="180" value="30"></div>
         </div>
         <div class="field"><label for="volBio">Short bio * <span class="field-flag pub">Public</span></label><textarea id="volBio" maxlength="800" required placeholder="A few sentences organizations will see on your public profile."></textarea></div>
+        <div class="field"><label for="volWebsite">Practice website or Psychology Today profile <span class="field-flag pub">Public</span></label><input type="text" id="volWebsite" placeholder="https://"><div class="hint">Optional. Helps organizations learn more and helps us verify your license.</div></div>
+
+        <fieldset class="subsection">
+          <legend>Professional liability insurance <span class="field-flag priv">Private</span></legend>
+          <p class="hint">Required. C4C's insurance does not cover presenters, so you'll present under your own policy. These details are seen only by C4C, and are shared with a host organization only if it asks.</p>
+          <div class="row2">
+            <div class="field"><label for="volInsCarrier">Carrier *</label><input type="text" id="volInsCarrier"></div>
+            <div class="field"><label for="volInsPolicy">Policy number *</label><input type="text" id="volInsPolicy"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="volInsLimits">Limits (per occurrence / aggregate) *</label><input type="text" id="volInsLimits" placeholder="e.g. $1M / $3M"></div>
+            <div class="field"><label for="volInsExpires">Expiration date *</label><input type="date" id="volInsExpires"></div>
+          </div>
+        </fieldset>
+
         <div class="consent-box">
           <div class="consent-row"><input type="checkbox" id="volConsentAge"><label for="volConsentAge">I am 18 or older and licensed to practice as described above.</label></div>
+          <div class="consent-row"><input type="checkbox" id="volConsentInsurance"><label for="volConsentInsurance">I understand that Counselors for Change connects presenters with organizations but does not employ, supervise or insure them. I present under my own professional liability insurance.</label></div>
+          <div class="consent-row"><input type="checkbox" id="volCommit"><label for="volCommit">I'm willing to give at least one presentation a year if called. <span class="hint">(Encouraged, not required.)</span></label></div>
           <div class="consent-row"><input type="checkbox" id="volConsentPrivacy"><label for="volConsentPrivacy">I've read the <a href="#privacy" data-tab="privacy">Privacy &amp; Terms</a> and understand which fields are public and which stay private.</label></div>
         </div>
         <div class="error-text" id="volError" role="alert"></div>
@@ -153,9 +170,10 @@
       <h4>Before you sign up</h4>
       <ul>
         <li>Your name, credentials, expertise and bio are public once approved.</li>
-        <li>Your license number is used for verification only.</li>
-        <li>You set your availability. Organizations propose times, and you pick the one that works.</li>
-        <li>Donations from organizations support the initiative and honorariums for presenters.</li>
+        <li>Your license number and insurance are used for verification only. We check your license automatically and recheck it monthly.</li>
+        <li>After you submit, you'll get an email to set up your login so you can edit your profile at any time.</li>
+        <li>You share general availability windows. Once you connect with an organization, you settle the exact date together.</li>
+        <li>What you get: visibility in your community, a ready-made slide template and resource bank, and a way to give back.</li>
       </ul>
     </aside>
   </div>
@@ -207,6 +225,10 @@
           <div class="field"><label for="reqEmail">Contact email *</label><input type="email" id="reqEmail" autocomplete="email" required></div>
         </div>
         <div class="row2">
+          <div class="field"><label for="reqCc">CC emails</label><input type="text" id="reqCc" placeholder="principal@school.org, counselor@school.org"><div class="hint">Optional. These people are copied on every update about this request.</div></div>
+          <div class="field"><label for="reqPrior">Have you worked with or talked to anyone at C4C before?</label><select id="reqPrior"><option value="">Select one</option><option value="yes">Yes</option><option value="no">No, this is our first time</option></select></div>
+        </div>
+        <div class="row2">
           <div class="field"><label for="reqEventType">Event type *</label><select id="reqEventType" required></select></div>
           <div class="field"><label for="reqDuration">Session length</label>
             <select id="reqDuration"><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></div>
@@ -219,13 +241,19 @@
           <div class="field"><label for="reqAttendees">Expected attendees</label><input type="number" id="reqAttendees" min="1"></div>
           <div class="field"><label for="reqLocation">Location or meeting link</label><input type="text" id="reqLocation" placeholder="Address, or 'Zoom link to follow'"></div>
         </div>
-        <div class="field">
-          <span class="label">Propose 2–3 possible times * <span class="hint">The counselor picks the one that works best.</span></span>
+        <div class="row2">
+          <div class="field"><label for="reqWindowStart">Preferred window: earliest date *</label><input type="date" id="reqWindowStart"></div>
+          <div class="field"><label for="reqWindowEnd">Latest date *</label><input type="date" id="reqWindowEnd"></div>
+        </div>
+        <p class="hint" style="margin:-8px 0 16px">Most presenters need about 30 days' notice. You'll settle the exact date with your presenter once you're connected.</p>
+        <details class="field slot-details">
+          <summary>Already have specific times in mind? (optional)</summary>
           <div class="slot-row"><input type="date" data-slot-date="1" aria-label="Option 1 date"><input type="time" data-slot-time="1" aria-label="Option 1 time"><span class="slot-num">Option 1</span></div>
           <div class="slot-row"><input type="date" data-slot-date="2" aria-label="Option 2 date"><input type="time" data-slot-time="2" aria-label="Option 2 time"><span class="slot-num">Option 2</span></div>
-          <div class="slot-row"><input type="date" data-slot-date="3" aria-label="Option 3 date"><input type="time" data-slot-time="3" aria-label="Option 3 time"><span class="slot-num">Option 3 (optional)</span></div>
-        </div>
+          <div class="slot-row"><input type="date" data-slot-date="3" aria-label="Option 3 date"><input type="time" data-slot-time="3" aria-label="Option 3 time"><span class="slot-num">Option 3</span></div>
+        </details>
         <div class="field"><span class="label">Audience *</span><div class="chipset" id="reqAudience" data-options="AUDIENCES"></div></div>
+        <div class="field"><label for="reqAges">Age or grade range</label><input type="text" id="reqAges" placeholder="e.g. Grades 6–8, or adults"></div>
         <div class="field"><span class="label">Topics of interest</span><div class="chipset" id="reqTopics" data-options="EXPERTISE"></div></div>
         <div class="field"><label for="reqDesc">Tell us about the session *</label><textarea id="reqDesc" required placeholder="Goals, context, anything the speaker should know. Please don't include students' personal information."></textarea></div>
         <div class="field">
@@ -244,11 +272,20 @@
     <aside class="side-note">
       <h4>What happens next</h4>
       <ul>
-        <li>If you requested a specific counselor, they get a link to pick one of your times.</li>
-        <li>If not, C4C matches you with a licensed professional whose expertise fits.</li>
-        <li>Once a time is confirmed, both sides get Google Calendar and .ics links.</li>
-        <li>Donations at any level fund honorariums and expand mental health access.</li>
+        <li>You'll get a tracking number so you can check your request's status at any time.</li>
+        <li>If you chose a presenter, they're invited to accept. If not, C4C suggests the best-fit verified professionals.</li>
+        <li>Once connected, you and your presenter settle the exact date directly, and both sides get calendar links.</li>
+        <li>New to C4C? We'll offer a quick 30-minute intro call.</li>
       </ul>
+      <div class="card track-card">
+        <h4>Track a request</h4>
+        <form id="trackForm">
+          <div class="field"><label for="trackId">Tracking number</label><input type="text" id="trackId" placeholder="C4C-XXXXXX"></div>
+          <div class="field"><label for="trackEmail">Contact email</label><input type="email" id="trackEmail"></div>
+          <button type="submit" class="btn btn-outline btn-sm btn-block">Check status</button>
+        </form>
+        <div id="trackResult" class="track-result" aria-live="polite"></div>
+      </div>
     </aside>
   </div>
 </section>
@@ -261,13 +298,13 @@
     <p style="font-size:.82rem">Draft. Replace with counsel-reviewed language before launch.</p>
     <div class="callout warn"><p><strong>Before launch:</strong> this is a plain-language starting point, not legal advice. Have it reviewed by an attorney familiar with nonprofit, data privacy and charitable solicitation law in the states where C4C operates.</p></div>
     <h3>What we collect</h3>
-    <p><strong>From licensed professionals:</strong> name, email, phone (optional), city/state, license type, license state, license number, years practicing, expertise, audiences, session formats, delivery, availability windows, timezone, minimum notice and a short bio.</p>
+    <p><strong>From licensed professionals:</strong> name, email, phone (optional), city/state, license type, license state, license number, years practicing, expertise, audiences, session formats, delivery, availability windows, timezone, minimum notice, a short bio, an optional website, and professional liability insurance details (carrier, policy number, limits and expiration).</p>
     <p><strong>From organizations:</strong> organization name and type, contact name and email, event type, length, delivery, timezone, location or meeting link, expected attendees, audience, topics, proposed times, event description and selected support level.</p>
     <h3>What's public vs. private</h3>
     <table class="privacy-table">
       <tr><th>Information</th><th>Visibility</th></tr>
       <tr><td>Counselor name, license type and state, city/state, bio, expertise, audiences, formats, availability windows</td><td>Public, once C4C approves the profile.</td></tr>
-      <tr><td>Counselor email, phone, license number, years practicing, timezone, notice preference</td><td>Private. Visible to C4C administrators.</td></tr>
+      <tr><td>Counselor email, phone, license number, insurance details, years practicing, timezone, notice preference</td><td>Private. Visible to C4C administrators. Insurance details are shared with a host organization only if it asks.</td></tr>
       <tr><td>Organization contact and event details, proposed times</td><td>Private. Visible to C4C administrators and to the requested or matched counselor.</td></tr>
       <tr><td>Support level</td><td>Private. Recording a level does not process a payment.</td></tr>
     </table>
@@ -279,6 +316,8 @@
       <li>To report aggregate, non-identifying statistics.</li>
       <li>We do not sell personal information or use it for advertising.</li>
     </ul>
+    <h3>C4C connects; it does not employ or insure presenters</h3>
+    <p>Presenters are independent professionals. They are not employees or agents of Counselors for Change, and they present under their own professional liability insurance. C4C's insurance does not cover them.</p>
     <h3>No independent background checks</h3>
     <p>C4C reviews self-reported license information but does not run background checks. Organizations remain responsible for their own vetting, especially for events involving minors.</p>
     <h3>Eligibility</h3>

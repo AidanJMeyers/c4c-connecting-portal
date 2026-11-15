@@ -11,3 +11,4 @@ docs/internal/
 # exported data never belongs in the repo
 c4c-*.csv
 c4c-portal-backup.json
+.claude/

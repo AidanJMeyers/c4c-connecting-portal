@@ -185,8 +185,13 @@
     if(!sel.volExpertise.size) missing.push("at least one area of expertise");
     if(!sel.volAudience.size) missing.push("at least one audience");
     if(!v("volBio")) missing.push("a short bio");
+    if(!v("volInsCarrier")) missing.push("insurance carrier");
+    if(!v("volInsPolicy")) missing.push("insurance policy number");
+    if(!v("volInsLimits")) missing.push("insurance limits");
+    if(!v("volInsExpires")) missing.push("insurance expiration date");
     if(missing.length) return showError(err, "Please add: " + missing.join(", ") + ".");
-    if(!$("#volConsentAge").checked || !$("#volConsentPrivacy").checked) return showError(err, "Please confirm both checkboxes before submitting.");
+    if(v("volInsExpires") < new Date().toISOString().slice(0,10)) return showError(err, "Your liability insurance appears to be expired. Please enter a current policy.");
+    if(!$("#volConsentAge").checked || !$("#volConsentInsurance").checked || !$("#volConsentPrivacy").checked) return showError(err, "Please confirm the age, insurance and privacy checkboxes before submitting.");
     if(counselors.some(c => c.email.toLowerCase() === v("volEmail").toLowerCase())) return showError(err, "A profile with this email already exists. Contact " + CFG.contactEmail + " to update it.");
     showError(err, "");
 
@@ -196,7 +201,10 @@
       licenseType: v("volLicenseType"), licenseState: v("volLicenseState").toUpperCase(), licenseNum: v("volLicenseNum"),
       years: v("volYears"), expertise: [...sel.volExpertise], audiences: [...sel.volAudience], eventTypes: [...sel.volEventTypes],
       formats: [...sel.volFormat], availability: [...sel.volAvailability], timezone: v("volTimezone"), leadTime: v("volLeadTime"),
-      bio: v("volBio"), status: CFG.requireApproval ? "pending" : "approved", dateAdded: new Date().toISOString()
+      bio: v("volBio"), website: v("volWebsite"),
+      insurance: { carrier: v("volInsCarrier"), policy: v("volInsPolicy"), limits: v("volInsLimits"), expires: v("volInsExpires") },
+      commitAnnual: $("#volCommit").checked,
+      status: CFG.requireApproval ? "pending" : "approved", dateAdded: new Date().toISOString()
     };
     try{
       counselors = await Store.upsert("counselors", entry);
@@ -204,7 +212,7 @@
         license_type: entry.licenseType, expertise: entry.expertise.join(", "), audiences: entry.audiences.join(", ") });
       const n = $("#volNotice"); n.classList.add("show");
       n.textContent = CFG.requireApproval
-        ? "Thanks! Your profile was submitted. C4C will verify your license and email you when it's live in the directory."
+        ? "Thanks! Your profile was submitted. C4C will verify your license and insurance, then email you when it's live in the directory. (In the live version you'll also get a link to set up your login.)"
         : "You're in the directory! Organizations can now find and request you.";
       e.target.reset(); ["volExpertise","volAudience","volEventTypes","volFormat","volAvailability"].forEach(clearChips);
       refreshAll(); n.scrollIntoView({ behavior:"smooth", block:"center" });
@@ -267,11 +275,17 @@
     if(!v("reqEventType")) missing.push("event type");
     if(!sel.reqAudience.size) missing.push("audience");
     if(!v("reqDesc")) missing.push("a session description");
-    const slots = [1,2,3].map(i => ({ date: $(`[data-slot-date="${i}"]`).value, time: $(`[data-slot-time="${i}"]`).value })).filter(s => s.date && s.time);
-    if(slots.length < 2) missing.push("at least 2 proposed times");
+    const ws = v("reqWindowStart"), we = v("reqWindowEnd"), todayStr = new Date().toISOString().slice(0,10);
+    if(!ws || !we) missing.push("a preferred date window");
     if(missing.length) return showError(err, "Please add: " + missing.join(", ") + ".");
+    if(ws < todayStr || we < ws) return showError(err, "The preferred window must start today or later, and end on or after its start date.");
+    const rawSlots = [1,2,3].map(i => ({ date: $(`[data-slot-date="${i}"]`).value, time: $(`[data-slot-time="${i}"]`).value }));
+    if(rawSlots.some(s => !!s.date !== !!s.time)) return showError(err, "Each specific time needs both a date and a time.");
+    const slots = rawSlots.filter(s => s.date && s.time);
     const tz = v("reqTimezone");
-    if(slots.some(s => zonedToUtc(s.date, s.time, tz) < new Date())) return showError(err, "Proposed times must be in the future.");
+    if(slots.some(s => zonedToUtc(s.date, s.time, tz) < new Date())) return showError(err, "Specific times must be in the future.");
+    const cc = v("reqCc").split(/[,;\s]+/).filter(Boolean);
+    if(cc.some(x => !isEmail(x))) return showError(err, "One of the CC emails doesn't look right. Separate addresses with commas.");
     if(!$("#reqConsentAge").checked || !$("#reqConsentPrivacy").checked) return showError(err, "Please confirm both checkboxes before submitting.");
     showError(err, "");
 
@@ -279,7 +293,9 @@
     const custom = v("reqCustomAmount");
     const c = counselors.find(x => x.id === targetedId);
     const entry = {
-      id: genId(), confirmToken: genId(16), orgName: v("reqOrgName"), orgType: v("reqOrgType"), contact: v("reqContact"), email: v("reqEmail"),
+      id: genId(), confirmToken: genId(16), trackingId: newTrackingId(),
+      orgName: v("reqOrgName"), orgType: v("reqOrgType"), contact: v("reqContact"), email: v("reqEmail"),
+      cc, priorContact: v("reqPrior"), ages: v("reqAges"), windowStart: ws, windowEnd: we,
       eventType: v("reqEventType"), duration: v("reqDuration"), format: v("reqFormat"), timezone: tz, attendees: v("reqAttendees"),
       location: v("reqLocation"), proposedSlots: slots, confirmedSlotIndex: null, audiences: [...sel.reqAudience], topics: [...sel.reqTopics],
       description: v("reqDesc"), donation: custom ? `$${custom} (custom)` : (selectedDonation ? "$" + selectedDonation.replace("-", "–$") : "Not specified"),
@@ -289,13 +305,17 @@
     try{
       requests = await Store.upsert("requests", entry);
       const params = { org_name: entry.orgName, contact_name: entry.contact, contact_email: entry.email, event_type: entry.eventType,
-        audiences: entry.audiences.join(", "), proposed_slots: slots.map((s,i) => `Option ${i+1}: ${formatSlot(s, tz)}`).join(" | "),
+        audiences: entry.audiences.join(", "), tracking_id: entry.trackingId, window: fmtWindow(entry),
+        proposed_slots: slots.map((s,i) => `Option ${i+1}: ${formatSlot(s, tz)}`).join(" | "), cc: cc.join(", "),
+        first_time: entry.priorContact === "no" ? "Yes, offer an intro call" : "No",
         donation: entry.donation, counselor_name: entry.counselorName || "Needs matching", confirm_url: confirmUrl(entry.confirmToken) };
       notify(CFG.emailjs.templateNewRequest, { ...params, to_email: CFG.emailjs.adminEmail });
       if(c) notify(CFG.emailjs.templateNewRequest, { ...params, to_email: c.email });
       const n = $("#reqNotice"); n.classList.add("show");
-      n.textContent = c ? `Request sent! ${c.name} will pick one of your proposed times. We'll email ${entry.email} once they do.`
-                        : `Request submitted! We'll match you with a licensed professional and follow up at ${entry.email}.`;
+      n.textContent = `Request received. Your tracking number is ${entry.trackingId}. ` +
+        (c ? `${c.name} will be invited to accept, and we'll email ${entry.email} when they reply.`
+           : `C4C will suggest best-fit presenters and follow up at ${entry.email}.`) +
+        (entry.priorContact === "no" ? " Since this is your first time with C4C, we'll also reach out to offer a 30-minute intro call." : "");
       e.target.reset(); clearChips("reqAudience"); clearChips("reqTopics");
       $$("#donationCards .radio-card").forEach(x => x.setAttribute("aria-pressed","false")); selectedDonation = null; setTarget(null);
       refreshAll(); n.scrollIntoView({ behavior:"smooth", block:"center" });
@@ -303,13 +323,51 @@
     btn.disabled = false;
   });
 
+  /* ---------------- Tracking ---------------- */
+  function newTrackingId(){
+    const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", a = new Uint8Array(6); crypto.getRandomValues(a);
+    return "C4C-" + Array.from(a, b => abc[b % abc.length]).join("");
+  }
+  const fmtDay = d => { if(!d) return ""; const [y,m,dd] = d.split("-").map(Number); return new Date(Date.UTC(y, m-1, dd)).toLocaleDateString("en-US", { timeZone:"UTC", month:"short", day:"numeric", year:"numeric" }); };
+  const fmtWindow = r => r.windowStart ? `${fmtDay(r.windowStart)} to ${fmtDay(r.windowEnd)}` : "";
+  $("#trackForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const id = $("#trackId").value.trim().toUpperCase(), em = $("#trackEmail").value.trim().toLowerCase(), out = $("#trackResult");
+    const r = requests.find(x => x.trackingId === id && x.email.toLowerCase() === em);
+    if(!r){ out.textContent = "We couldn't find a request with that tracking number and email."; return; }
+    const when = r.confirmedSlotIndex != null ? formatSlot(r.proposedSlots[r.confirmedSlotIndex], r.timezone) : fmtWindow(r);
+    out.innerHTML = `<div><strong>${esc(r.eventType)}</strong> for ${esc(r.orgName)}</div>
+      <div style="margin:6px 0"><span class="tr-status">${esc(r.status)}</span></div>
+      <div>${esc(OPT.STATUS_HELP[r.status] || "")}</div>
+      <div class="hint">${r.counselorName && !["New","Matching"].includes(r.status) ? "Presenter: " + esc(r.counselorName) + " · " : ""}${esc(when)}</div>
+      <ol>${(r.history||[]).map(h => `<li>${esc(fmtDate(h.at))}: ${esc(h.what)}</li>`).join("")}</ol>`;
+  });
+
+  /* ---------------- Matching suggestions ---------------- */
+  // Rank approved presenters for a request: topic fit counts most, then audience, session type, delivery and notice.
+  function scoreCounselor(c, r){
+    const hit = (a, b) => (a||[]).filter(x => (b||[]).includes(x)).length;
+    let s = hit(r.topics, c.expertise) * 3 + hit(r.audiences, c.audiences) * 2;
+    if((c.eventTypes||[]).includes(r.eventType)) s += 1;
+    if(!(c.formats||[]).length || c.formats.includes(r.format)) s += 1;
+    if(r.windowEnd){
+      const days = (new Date(r.windowEnd) - new Date()) / 86400000;
+      if(days < (+c.leadTime || 30)) s -= 2;
+    }
+    return s;
+  }
+  function rankedCandidates(r){
+    return counselors.filter(c => c.status === "approved").map(c => ({ c, score: scoreCounselor(c, r) })).sort((a, b) => b.score - a.score);
+  }
+
   /* ---------------- Confirmation flow ---------------- */
   const confirmUrl = token => location.origin + location.pathname + "#confirm=" + token;
   function detailBlock(r){
     const row = (k, val) => val ? `<div class="detail-row"><span>${k}</span><span>${val}</span></div>` : "";
     return `<div class="card">${row("Organization", esc(r.orgName))}${row("Contact", esc(r.contact) + " · " + esc(r.email))}${row("Event type", esc(r.eventType))}
       ${row("Length", esc(r.duration) + " minutes")}${row("Delivery", esc(r.format))}${row("Attendees", esc(r.attendees))}
-      ${row("Audience", (r.audiences||[]).map(esc).join(", "))}${row("Topics", (r.topics||[]).map(esc).join(", "))}${row("Location", esc(r.location))}
+      ${row("Preferred window", esc(fmtWindow(r)))}${row("Audience", (r.audiences||[]).map(esc).join(", "))}${row("Ages / grades", esc(r.ages))}
+      ${row("Topics", (r.topics||[]).map(esc).join(", "))}${row("Location", esc(r.location))}
       <div class="detail-row"><span>About</span><span style="font-weight:400;max-width:70%">${esc(r.description)}</span></div></div>`;
   }
   async function saveRequest(r, what){ (r.history = r.history || []).push({ at: new Date().toISOString(), what }); requests = await Store.upsert("requests", r); refreshAll(); }
@@ -337,7 +395,25 @@
       box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Request closed</div><h2>This request was ${esc(r.status.toLowerCase())}</h2><p>No further action is needed.</p></div>`;
       return;
     }
+    if(r.status === "Connected"){
+      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">You're connected</div><h2>Thanks for saying yes</h2>
+        <p>Reach out to <strong>${esc(r.contact)}</strong> at <a href="mailto:${esc(r.email)}">${esc(r.email)}</a> to settle the exact date inside their window (${esc(fmtWindow(r))}). C4C has been notified and is here if you need anything.</p></div>${detailBlock(r)}`;
+      return;
+    }
     const first = (c ? c.name : "there").split(" ")[0];
+    if(!(r.proposedSlots||[]).length){
+      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Speaker request</div><h2>${esc(r.orgName)} would like you to present</h2>
+        <p>Hi ${esc(first)}, they're hoping for a date between <strong>${esc(fmtWindow(r))}</strong>. If you accept, you'll settle the exact date with them directly.</p></div>
+        ${detailBlock(r)}
+        <div class="btn-row"><button type="button" class="btn btn-primary" id="acceptBtn">I'm interested, connect us</button>
+        <button type="button" class="btn btn-outline" id="declineBtn">I can't take this one</button></div>`;
+      $("#acceptBtn").addEventListener("click", async () => { r.status = "Connected"; await saveRequest(r, "Presenter accepted; connected with organization"); renderConfirm(token); });
+      $("#declineBtn").addEventListener("click", async () => {
+        if(!confirm("Decline this request? C4C will follow up with the organization.")) return;
+        r.status = "Declined"; await saveRequest(r, "Declined by presenter"); renderConfirm(token);
+      });
+      return;
+    }
     let chosen = null;
     box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Speaker request</div><h2>${esc(r.orgName)} would like to book you</h2>
       <p>Hi ${esc(first)}, pick the time that works best, or decline if none do.</p></div>
@@ -393,8 +469,9 @@
   function renderAdmin(){
     const pending = counselors.filter(c => c.status === "pending").length;
     const open = requests.filter(r => ["New","Matching","Awaiting counselor"].includes(r.status)).length;
-    const confirmed = requests.filter(r => ["Confirmed","Completed"].includes(r.status)).length;
-    $("#kpis").innerHTML = [[counselors.filter(c => c.status === "approved").length, "Approved counselors"], [pending, "Pending review"], [open, "Open requests"], [confirmed, "Confirmed sessions"]]
+    const confirmed = requests.filter(r => ["Connected","Confirmed","Completed"].includes(r.status)).length;
+    const todayStr = new Date().toISOString().slice(0,10);
+    $("#kpis").innerHTML = [[counselors.filter(c => c.status === "approved").length, "Approved counselors"], [pending, "Pending review"], [open, "Open requests"], [confirmed, "Connections made"]]
       .map(k => `<div class="kpi"><b>${k[0]}</b><span>${k[1]}</span></div>`).join("");
 
     const f = $("#adminCounselorFilter").value;
@@ -403,24 +480,26 @@
     $("#adminCounselorBody").innerHTML = cl.length ? cl.map(c => `<tr>
       <td><strong>${esc(c.name)}</strong><br><span class="hint">${esc(c.location)}</span></td>
       <td>${esc(c.email)}${c.phone ? "<br>" + esc(c.phone) : ""}</td>
-      <td>${esc((c.licenseType||"").split(" — ")[0])}<br><span class="hint">${esc(c.licenseState)} · #${esc(c.licenseNum)}${c.years ? " · " + esc(c.years) + " yrs" : ""}</span></td>
+      <td>${esc((c.licenseType||"").split(" — ")[0])}<br><span class="hint">${esc(c.licenseState)} · #${esc(c.licenseNum)}${c.years ? " · " + esc(c.years) + " yrs" : ""}</span>
+        <br><span class="hint">${c.insurance ? `Ins: ${esc(c.insurance.carrier)} · ${esc(c.insurance.limits)} · exp ${esc(fmtDay(c.insurance.expires))}${c.insurance.expires < todayStr ? ' <span class="flag-bad">EXPIRED</span>' : ""}` : '<span class="flag-bad">No insurance on file</span>'}</span>
+        ${c.commitAnnual ? '<br><span class="tagmini">1 talk / year</span>' : ""}</td>
       <td>${(c.expertise||[]).map(x => `<span class="tagmini">${esc(x)}</span>`).join("")}</td>
       <td>${fmtDate(c.dateAdded)}</td>
       <td><span class="status-pill ${esc(c.status)}">${STATUS_LABEL[c.status] || esc(c.status)}</span></td>
       <td>${c.status !== "approved" ? `<button class="link-btn" data-c-approve="${esc(c.id)}">Approve</button>` : ""}${c.status !== "rejected" ? `<button class="link-btn" data-c-reject="${esc(c.id)}">${c.status === "approved" ? "Unlist" : "Reject"}</button>` : ""}<button class="link-btn danger" data-c-remove="${esc(c.id)}">Remove</button></td>
     </tr>`).join("") : `<tr><td colspan="7" class="admin-empty">No counselors${f ? " with this status" : " yet"}.</td></tr>`;
 
-    const approved = counselors.filter(c => c.status === "approved");
     $("#adminRequestCount").textContent = requests.length;
-    $("#adminRequestBody").innerHTML = requests.length ? requests.slice().reverse().map(r => `<tr>
-      <td><strong>${esc(r.orgName)}</strong><br><span class="hint">${esc(r.orgType)}<br>${esc(r.contact)} · ${esc(r.email)}</span></td>
-      <td>${esc(r.eventType)}<br><span class="hint">${esc(r.duration)} min · ${esc(r.format)}${r.attendees ? " · " + esc(r.attendees) + " people" : ""}</span><br>${(r.audiences||[]).map(x => `<span class="tagmini">${esc(x)}</span>`).join("")}</td>
-      <td>${(r.proposedSlots||[]).map((s,i) => `<div style="${r.confirmedSlotIndex === i ? "font-weight:700;color:var(--deep-teal)" : ""}">${r.confirmedSlotIndex === i ? "✓ " : ""}${esc(formatSlot(s, r.timezone))}</div>`).join("")}</td>
+    $("#adminRequestBody").innerHTML = requests.length ? requests.slice().reverse().map(r => { const ranked = rankedCandidates(r); return `<tr>
+      <td><strong>${esc(r.orgName)}</strong><br><span class="hint">${esc(r.trackingId || "")}<br>${esc(r.orgType)}<br>${esc(r.contact)} · ${esc(r.email)}${(r.cc||[]).length ? "<br>CC: " + r.cc.map(esc).join(", ") : ""}</span>${r.priorContact === "no" ? '<br><span class="tagmini">New to C4C: offer intro call</span>' : ""}</td>
+      <td>${esc(r.eventType)}<br><span class="hint">${esc(r.duration)} min · ${esc(r.format)}${r.attendees ? " · " + esc(r.attendees) + " people" : ""}${r.ages ? " · " + esc(r.ages) : ""}</span><br>${(r.audiences||[]).map(x => `<span class="tagmini">${esc(x)}</span>`).join("")}</td>
+      <td>${r.windowStart ? `<div class="hint">Window: ${esc(fmtWindow(r))}</div>` : ""}${(r.proposedSlots||[]).map((s,i) => `<div style="${r.confirmedSlotIndex === i ? "font-weight:700;color:var(--deep-teal)" : ""}">${r.confirmedSlotIndex === i ? "✓ " : ""}${esc(formatSlot(s, r.timezone))}</div>`).join("")}</td>
       <td>${esc(r.donation)}</td>
-      <td><select class="status-select" data-r-assign="${esc(r.id)}" aria-label="Assign counselor"><option value="">Needs matching</option>${approved.map(c => `<option value="${esc(c.id)}" ${c.id === r.counselorId ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
+      <td><select class="status-select" data-r-assign="${esc(r.id)}" aria-label="Assign presenter"><option value="">Needs matching</option>${ranked.map((x, i) => `<option value="${esc(x.c.id)}" ${x.c.id === r.counselorId ? "selected" : ""}>${i < 5 && x.score > 0 ? "★ " : ""}${esc(x.c.name)} (fit ${x.score})</option>`).join("")}</select>
+        <div class="hint">★ = top 5 suggested</div></td>
       <td><select class="status-select" data-r-status="${esc(r.id)}" aria-label="Request status">${OPT.REQUEST_STATUSES.map(s => `<option ${r.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-      <td>${r.counselorId ? `<button class="link-btn" data-r-copy="${esc(r.confirmToken)}">Copy confirm link</button><br>` : ""}<button class="link-btn danger" data-r-remove="${esc(r.id)}">Remove</button></td>
-    </tr>`).join("") : `<tr><td colspan="7" class="admin-empty">No speaker requests yet.</td></tr>`;
+      <td>${r.counselorId ? `<button class="link-btn" data-r-copy="${esc(r.confirmToken)}">Copy invite link</button><br>` : ""}<button class="link-btn danger" data-r-remove="${esc(r.id)}">Remove</button></td>
+    </tr>`; }).join("") : `<tr><td colspan="7" class="admin-empty">No speaker requests yet.</td></tr>`;
   }
 
   async function setCounselorStatus(id, status){
@@ -437,7 +516,7 @@
     else if(d.rRemove){ if(confirm("Permanently remove this request? This can't be undone.")){ requests = await Store.remove("requests", d.rRemove); refreshAll(); } }
     else if(d.rCopy){
       const url = confirmUrl(d.rCopy);
-      try{ await navigator.clipboard.writeText(url); e.target.textContent = "✓ Copied"; setTimeout(() => e.target.textContent = "Copy confirm link", 1500); }
+      try{ await navigator.clipboard.writeText(url); e.target.textContent = "✓ Copied"; setTimeout(() => e.target.textContent = "Copy invite link", 1500); }
       catch(x){ prompt("Copy this link and send it to the counselor:", url); }
     }
   });
@@ -462,10 +541,10 @@
     ["Name",c=>c.name],["Email",c=>c.email],["Phone",c=>c.phone],["Location",c=>c.location],["License Type",c=>c.licenseType],
     ["License State",c=>c.licenseState],["License Number",c=>c.licenseNum],["Years",c=>c.years],["Expertise",c=>j(c.expertise)],
     ["Audiences",c=>j(c.audiences)],["Session Formats",c=>j(c.eventTypes)],["Delivery",c=>j(c.formats)],["Availability",c=>j(c.availability)],
-    ["Timezone",c=>c.timezone],["Min Notice (days)",c=>c.leadTime],["Bio",c=>c.bio],["Status",c=>c.status],["Date Added",c=>c.dateAdded]
+    ["Timezone",c=>c.timezone],["Min Notice (days)",c=>c.leadTime],["Bio",c=>c.bio],["Website",c=>c.website],["Insurance Carrier",c=>c.insurance?.carrier],["Insurance Policy",c=>c.insurance?.policy],["Insurance Limits",c=>c.insurance?.limits],["Insurance Expires",c=>c.insurance?.expires],["Annual Commitment",c=>c.commitAnnual?"Yes":"No"],["Status",c=>c.status],["Date Added",c=>c.dateAdded]
   ]), "c4c-counselors.csv", "text/csv"));
   $("#exportRequestsBtn").addEventListener("click", () => download(toCSV(requests, [
-    ["Organization",r=>r.orgName],["Org Type",r=>r.orgType],["Contact",r=>r.contact],["Email",r=>r.email],["Event Type",r=>r.eventType],
+    ["Tracking ID",r=>r.trackingId],["Organization",r=>r.orgName],["Org Type",r=>r.orgType],["Contact",r=>r.contact],["Email",r=>r.email],["CC",r=>j(r.cc)],["New to C4C",r=>r.priorContact==="no"?"Yes":""],["Window",r=>fmtWindow(r)],["Ages",r=>r.ages],["Event Type",r=>r.eventType],
     ["Duration (min)",r=>r.duration],["Delivery",r=>r.format],["Attendees",r=>r.attendees],["Timezone",r=>r.timezone],["Location",r=>r.location],
     ["Proposed Times",r=>(r.proposedSlots||[]).map(s=>formatSlot(s,r.timezone)).join(" | ")],
     ["Confirmed Time",r=>r.confirmedSlotIndex != null ? formatSlot(r.proposedSlots[r.confirmedSlotIndex], r.timezone) : ""],
@@ -482,7 +561,7 @@
   /* ---------------- Sample data (draft only, clearly fictional) ---------------- */
   async function seed(){
     if(counselors.some(c => c.sample)) return alert("Sample counselors are already loaded.");
-    const base = { phone:"", years:"", timezone:"America/New_York", leadTime:"14", status:"approved", sample:true, licenseNum:"SAMPLE" };
+    const base = { phone:"", years:"", timezone:"America/New_York", leadTime:"30", status:"approved", sample:true, licenseNum:"SAMPLE", insurance:{ carrier:"Sample Carrier", policy:"SAMPLE", limits:"$1M / $3M", expires:"2027-12-31" } };
     const now = Date.now();
     const samples = [
       { name:"Sample Counselor A", location:"Melbourne, FL", licenseType:OPT.LICENSE_TYPES[2], licenseState:"FL", expertise:["Relationships & Family","Parenting Support","Youth & Adolescent Mental Health"], audiences:["Parents & Caregivers","Educators & School Staff"], eventTypes:["Workshop","Panel Discussion"], formats:["Virtual","In-person"], availability:["Weekday evenings","Saturday mornings"], bio:"Example profile for demo purposes. Family therapist who leads parent workshops on supporting teens through stress and big transitions." },

@@ -50,5 +50,16 @@ window.C4C_OPTIONS = {
     ["Pacific/Honolulu","Hawaii (HT)"]],
   DONATION_TIERS: [["0-150","$0 – $150","Community Supporter"],["150-350","$150 – $350","Advocate"],
     ["350-750","$350 – $750","Champion"],["750+","$750+","Partner"]],
-  REQUEST_STATUSES: ["New","Matching","Awaiting counselor","Confirmed","Completed","Declined","Cancelled"]
+  REQUEST_STATUSES: ["New","Matching","Awaiting counselor","Connected","Confirmed","Completed","Declined","Cancelled"],
+  // Statuses shown to organizations on the tracking lookup
+  STATUS_HELP: {
+    "New": "Received. C4C is reviewing your request.",
+    "Matching": "C4C is reaching out to best-fit presenters.",
+    "Awaiting counselor": "A presenter has been invited and we're waiting for their reply.",
+    "Connected": "You're connected with a presenter. Settle the exact date with them directly.",
+    "Confirmed": "Your session is confirmed.",
+    "Completed": "Your session is complete. Thank you!",
+    "Declined": "The invited presenter couldn't take this one. C4C will follow up.",
+    "Cancelled": "This request was cancelled."
+  }
 };

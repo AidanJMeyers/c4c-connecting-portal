@@ -1,4 +1,6 @@
-# Counselors for Change: Connecting Portal (draft)
+# Connections 4 Change (draft)
+
+A Counselors for Change initiative. Live draft: https://aidanjmeyers.github.io/c4c-connecting-portal/
 
 This portal connects licensed therapists, counselors and psychologists with schools and community organizations. Through Counselors for Change (C4C) they can arrange panels, workshops, psychoeducation sessions and staff trainings.
 
@@ -8,11 +10,11 @@ This portal connects licensed therapists, counselors and psychologists with scho
 
 | Area | Features |
 |---|---|
-| **Counselors** | Sign-up form with public and private fields, license info, expertise, audiences, session formats, delivery, availability windows and notice period. New profiles wait for admin approval before going public. |
+| **Counselors** | Sign-up form with public and private fields, license info, private liability insurance details, expertise, audiences, session formats, delivery, availability windows and notice period (30 days by default). New profiles wait for admin approval before going public. |
 | **Directory** | Text search, expertise and audience filters, virtual/in-person filter, a "Verified" badge, and a "Request this speaker" button on each profile. |
-| **Schools / orgs** | Request form with 2–3 proposed times (timezone-aware), audience, topics, attendee count and an optional support/donation tier. No payment is taken. |
-| **Scheduling** | The counselor gets a private confirm link, picks a time or declines, and both sides get Google Calendar and `.ics` links. Times are converted correctly across timezones. |
-| **Admin (board)** | Passcode gate, KPI tiles, approve/reject/unlist counselors, assign counselors to unmatched requests, request status pipeline, copy confirm links, CSV exports, JSON backup and sample data for demos. |
+| **Schools / orgs** | Request form with a preferred date window (specific times optional), audience, age range, topics, attendee count, CC emails and an optional support tier. No payment is taken. Each request gets a tracking number with a status lookup. |
+| **Connecting** | The presenter gets a private invite link and accepts or declines. If specific times were proposed they pick one, and both sides get Google Calendar and `.ics` links. Otherwise the two are connected to settle the date directly. |
+| **Admin (board)** | Passcode gate, KPI tiles, approve/reject/unlist counselors, top-5 suggested presenters for unmatched requests, request status pipeline, copy confirm links, CSV exports, JSON backup and sample data for demos. |
 | **Privacy** | A draft Privacy & Terms page with a public/private field table. Needs attorney review before launch. |
 
 ## Run it locally
@@ -34,6 +36,8 @@ js/config.js        site settings + dropdown/chip option lists (edit these)
 js/storage.js       storage adapter: swap this for a real backend
 js/app.js           app logic
 ROADMAP.md          phased feature plan
+docs/SPEC.md        product spec from the 11/15/26 board work session
+db/schema.sql       draft database design for accounts (not yet deployed)
 ```
 
 ## Known limits of the draft
