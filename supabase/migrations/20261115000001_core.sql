@@ -427,7 +427,7 @@ language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
     'tracking_id', r.tracking_id, 'status', r.status, 'event_type', r.event_type,
     'window_start', r.window_start, 'window_end', r.window_end,
-    'audiences', r.audiences, 'topics', r.topics, 'delivery', r.delivery,
+    'audiences', r.audiences, 'topics', r.topics, 'delivery', r.delivery, 'timezone', r.timezone,
     'org_name', o.name, 'lead_name', o.lead_name, 'lead_email', o.lead_email,
     'presenter_name', pr.display_name, 'presenter_email', pf.email,
     'event_starts_at', e.starts_at, 'event_location', coalesce(e.location, r.location))

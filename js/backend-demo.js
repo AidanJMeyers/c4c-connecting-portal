@@ -55,7 +55,7 @@
   function requestPayload(r) {
     const o = orgOf(r), m = pro(r.matched_professional_id), e = eventOf(r);
     return { tracking_id: r.tracking_id, status: r.status, event_type: r.event_type, window_start: r.window_start,
-      window_end: r.window_end, audiences: r.audiences, topics: r.topics, delivery: r.delivery,
+      window_end: r.window_end, audiences: r.audiences, topics: r.topics, delivery: r.delivery, timezone: r.timezone,
       org_name: o.name, lead_name: o.lead_name, lead_email: o.lead_email,
       presenter_name: m ? m.display_name : null, presenter_email: m ? emailOf(m.id) : null,
       event_starts_at: e ? e.starts_at : null, event_location: (e && e.location) || r.location || null };
