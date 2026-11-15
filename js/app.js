@@ -694,6 +694,26 @@
     catch (err) { showError("siError", err.message); }
     finally { btn.disabled = false; }
   });
+  // A plain sign-in for C4C team members. Admin access comes from the allowlist in the
+  // database once the address is confirmed; this form grants nothing by itself.
+  $("#staffForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = val("stName"), email = val("stEmail").toLowerCase(), password = $("#stPassword").value;
+    if (!name) return showError("stError", "Add your name.");
+    if (!isEmail(email)) return showError("stError", "Enter a valid email address.");
+    if (password.length < CFG.minPasswordLength) return showError("stError", `Use a password of at least ${CFG.minPasswordLength} characters.`);
+    showError("stError", "");
+    const btn = e.target.querySelector("[type=submit]"); btn.disabled = true;
+    try {
+      const { needsConfirm } = await B.signUp({ email, password, role: "professional", full_name: name });
+      $("#stPassword").value = "";
+      if (needsConfirm) {
+        const n = $("#stNotice"); n.hidden = false;
+        n.innerHTML = `<strong>Check your email.</strong> We sent a confirmation link to ${esc(email)}. Open it to finish signing in.`;
+      } else await refresh();
+    } catch (err) { showError("stError", err.message); }
+    finally { btn.disabled = false; }
+  });
   $("#forgotBtn").addEventListener("click", e => run(e.target, async () => {
     const email = val("siEmail").toLowerCase();
     if (!isEmail(email)) return showError("siError", "Enter your email above first, then choose \"Forgot your password?\" again.");
@@ -1057,6 +1077,7 @@
     initUI();
     // Links from confirmation and reset emails come back with details in the address; surface any error.
     const hashErr = /error_description=([^&]+)/.exec(location.hash);
+    const cameFromEmailLink = /access_token=/.test(location.hash);
     try { await B.init(); }
     catch (e) { console.error(e); toast(e.message || "Could not start the sign-in service.", "error"); }
     await refresh();
@@ -1067,5 +1088,7 @@
     route();
     booted = true;
     await submitDraftIfAny();
+    // Arriving from a confirmation email with nothing left to submit: show the account, not the home page.
+    if (cameFromEmailLink && S.me && !S.recovery && currentView() === "home") { toast("Email confirmed. You're signed in."); go("account"); }
   })();
 })();

@@ -341,6 +341,18 @@
     </form>
     <div class="card demo-accounts" id="demoAccounts" hidden></div>
     <p class="center new-here">New here? <a href="#presenters">Join as a presenter</a> or <a href="#organizations">create an organization account</a>.</p>
+    <details class="card staff-signup pw-field" id="staffSignup">
+      <summary>C4C board or staff? Create your sign-in</summary>
+      <form id="staffForm" novalidate>
+        <p class="hint">For C4C team members who need the admin dashboard. Use your C4C email. Admin access switches on once you confirm the address.</p>
+        <div class="field"><label for="stName">Your name</label><input type="text" id="stName" autocomplete="name"></div>
+        <div class="field"><label for="stEmail">Email</label><input type="email" id="stEmail" autocomplete="email"></div>
+        <div class="field"><label for="stPassword">Create a password</label><input type="password" id="stPassword" autocomplete="new-password"><div class="hint">At least 8 characters.</div></div>
+        <div class="error-text" id="stError" role="alert"></div>
+        <div class="notice" id="stNotice" hidden></div>
+        <button type="submit" class="btn btn-outline btn-block">Create my sign-in</button>
+      </form>
+    </details>
   </div>
 
   <div class="container narrow" id="accountRecovery" hidden>
