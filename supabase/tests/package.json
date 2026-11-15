@@ -1,0 +1,8 @@
+{
+  "name": "c4c-db-tests",
+  "private": true,
+  "type": "module",
+  "description": "Runs the Connections 4 Change migrations on an in-process Postgres (PGlite) and checks the permission rules.",
+  "scripts": { "test": "node --test" },
+  "devDependencies": { "@electric-sql/pglite": "^0.3.0" }
+}
