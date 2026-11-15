@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connections 4 Change · Counselors for Change</title>
 <meta name="description" content="Connections 4 Change, by Counselors for Change, connects verified, licensed mental health professionals with schools and community organizations for panels, workshops and psychoeducation.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%230E7BAE' d='M48 12 L68 12 L38 51 L18 51 Z'/%3E%3Cpath fill='%230E7BAE' d='M53 30 L73 30 L73 93 L53 93 Z'/%3E%3Cpath fill='%2323B2BB' d='M10 51 L68 51 L68 42 L92 63 L68 84 L68 73 L10 73 Z'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='88' fill='%23fff'/%3E%3Cpath fill='%2311678C' d='M255.5 70 H342.5 L176 296 H86 Z'/%3E%3Cpath fill='%2311678C' d='M281.5 211 H343.5 V448 H281.5 Z'/%3E%3Cpath fill='%23149D95' d='M86 295.5 H343.5 V211 L434 327 L343.5 448 V367.5 H86 Z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,900;1,600;1,700;1,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- Bump the ?v= number on the stylesheet and the four scripts below whenever any of them changes,
      so browsers never pair a new page with old cached code. -->
-<link rel="stylesheet" href="css/styles.css?v=5">
+<link rel="stylesheet" href="css/styles.css?v=6">
 <script>
   // The portal handles every form in JavaScript. If a script ever fails to load, do nothing rather than reload the page.
   document.addEventListener("submit", function (e) { e.preventDefault(); }, true);
@@ -19,10 +19,17 @@
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="four-mark" viewBox="0 0 100 100">
-    <path fill="#0E7BAE" d="M 48 12 L 68 12 L 38 51 L 18 51 Z"/>
-    <path fill="#0E7BAE" d="M 53 30 L 73 30 L 73 93 L 53 93 Z"/>
-    <path fill="#23B2BB" d="M 10 51 L 68 51 L 68 42 L 92 63 L 68 84 L 68 73 L 10 73 Z"/>
+  <!-- The C4C "4" mark, traced from the icon on counselorsforchange.org (512 x 512 original):
+       a slanted stroke and an upright stem in blue, crossed by a teal arrow. -->
+  <defs>
+    <linearGradient id="four-arrow" gradientUnits="userSpaceOnUse" x1="86" y1="0" x2="434" y2="0">
+      <stop offset="0" stop-color="#14A397"/><stop offset="1" stop-color="#159793"/>
+    </linearGradient>
+  </defs>
+  <symbol id="four-mark" viewBox="30 29 460 460">
+    <path fill="#11678C" d="M255.5 70 H342.5 L176 296 H86 Z"/>
+    <path fill="#11678C" d="M281.5 211 H343.5 V448 H281.5 Z"/>
+    <path fill="url(#four-arrow)" d="M86 295.5 H343.5 V211 L434 327 L343.5 448 V367.5 H86 Z"/>
   </symbol>
 </svg>
 
@@ -580,9 +587,9 @@
 </footer>
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-<script src="js/config.js?v=5"></script>
-<script src="js/backend-demo.js?v=5"></script>
-<script src="js/backend-supabase.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/config.js?v=6"></script>
+<script src="js/backend-demo.js?v=6"></script>
+<script src="js/backend-supabase.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

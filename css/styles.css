@@ -33,7 +33,7 @@ button{font-family:inherit;cursor:pointer}
 .nav{position:sticky;top:0;z-index:50;background:var(--deep-teal);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .nav-top{display:flex;align-items:center;justify-content:center;padding:14px 24px 12px;max-width:1180px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff}
-.nav-mark{width:46px;height:46px;background:#fff;border-radius:8px;padding:5px;box-shadow:0 2px 6px rgba(0,0,0,.15);flex-shrink:0}
+.nav-mark{width:46px;height:46px;background:#fff;border-radius:8px;padding:3px;box-shadow:0 2px 6px rgba(0,0,0,.15);flex-shrink:0}
 .nav-mark svg{display:block;width:100%;height:100%}
 .wordmark{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:1.9rem;letter-spacing:.02em;line-height:1}
 .wordmark small{display:block;font-family:'Inter',sans-serif;font-style:normal;font-weight:600;font-size:.62rem;letter-spacing:.18em;color:var(--text-invert-soft);margin-top:4px}
@@ -95,6 +95,8 @@ section.view.active{display:block}
 .split-card p{color:var(--text-soft);margin:0 0 20px}
 .split-card.dark p{color:var(--text-invert-soft)}
 .card-mark{position:absolute;top:20px;right:20px;width:48px;height:48px;opacity:.85}
+/* The mark's blue disappears on the dark card, so it sits on a white tile there, as in the header. */
+.split-card.dark .card-mark{background:#fff;border-radius:8px;padding:3px;opacity:1}
 .split-card .btn-outline{background:#fff}
 
 /* ---------- buttons ---------- */
