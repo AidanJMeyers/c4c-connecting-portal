@@ -14,7 +14,7 @@ if (!detail) {
   for (const r of await q(sql)) console.log(`${r.section.padEnd(18)} ${String(r.items).padStart(4)}  ${r.hash}`);
 } else {
   // Re-run one section without the final aggregation, to see exactly which item differs.
-  const cte = { 1: 'fn', 2: 'pol', 3: 'col', 4: 'tg', 5: 'cg', 6: 'fg', 7: 'trg', 8: 'rls', 9: 'enum', a: 'allow' }[detail];
+  const cte = { 1: 'fn', 2: 'pol', 3: 'col', 4: 'tg', 5: 'cg', 6: 'fg', 7: 'trg', 8: 'rls', 9: 'enum' }[detail];
   const head = sql.slice(0, sql.indexOf('select section, count(*)'));
   for (const r of await q(`${head} select k, v from ${cte} order by k`)) console.log(`${r.k} = ${r.v}`);
 }

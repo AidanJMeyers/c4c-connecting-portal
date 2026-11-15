@@ -21,11 +21,8 @@ create policy allowlist_admin on admin_allowlist for all using (is_admin()) with
 revoke all on admin_allowlist from anon, authenticated;
 grant select, insert, delete on admin_allowlist to authenticated;      -- admins only, by RLS
 
-insert into admin_allowlist (email) values
-  ('chair@c4c.example'),
-  ('secretary@c4c.example'),
-  ('treasurer@c4c.example'),
-  ('member@c4c.example');
+-- The list itself is data, not structure. It is kept in the database only and never written
+-- into this public repository. Add or remove addresses in the Supabase SQL editor (see above).
 
 -- Promote on confirmation. Fires when a new user is created already confirmed, and when
 -- an existing user's email_confirmed_at is first set.

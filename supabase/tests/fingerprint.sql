@@ -49,8 +49,6 @@ with fn as (
   select t.typname::text as k, string_agg(e.enumlabel::text, ',' order by e.enumsortorder) as v
   from pg_type t join pg_enum e on e.enumtypid = t.oid join pg_namespace n on n.oid = t.typnamespace
   where n.nspname = 'public' group by 1
-), allow as (
-  select email as k, '' as v from admin_allowlist
 )
 select section, count(*)::int as items, md5(string_agg(k || '=' || v, ';' order by k)) as hash
 from (
@@ -62,7 +60,6 @@ from (
   select '6 function grants', * from fg union all
   select '7 triggers', * from trg union all
   select '8 row security', * from rls union all
-  select '9 enums', * from enum union all
-  select 'a admin list', * from allow
+  select '9 enums', * from enum
 ) s
 group by section order by section;
