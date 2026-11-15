@@ -1,9 +1,15 @@
 /* Connections 4 Change: site configuration. Edit before publishing. */
 window.C4C_CONFIG = {
-  // Backend. Leave both empty to run in demo mode (data stays in this browser).
-  // Both values are safe to publish: the database's own rules decide who can see what.
-  supabaseUrl: "",
-  supabaseKey: "",     // the project's "publishable" (anon) key, never the secret/service key
+  // Backend (Supabase project "connections-4-change"). Both values are safe to publish:
+  // they ship to every visitor's browser, and the database's own rules decide who sees what.
+  // Never put the secret (service role) key or the database password in this file.
+  supabaseUrl: "https://znzmqrrocikuxoesvaxc.supabase.co",
+  supabaseKey: "sb_publishable_GpF2BZyp_EtuSt63AEV7Nw_ufvj18w5",
+
+  // false = visitors get demo mode (data stays in their browser). Add ?live=1 to the address
+  // to use the real database for testing. Set to true once email sending is set up, because
+  // signing up needs a confirmation email to arrive. ?demo=1 always forces demo mode.
+  live: false,
 
   contactEmail: "info@counselorsforchange.org",
   minPasswordLength: 8,

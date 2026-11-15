@@ -74,6 +74,18 @@ test('anonymous visitors see approved public profiles and nothing else', async (
   await assert.rejects(as(null, () => q(`insert into professionals (id, display_name, license_type, license_state, bio) values (gen_random_uuid(), 'x', 'LPC', 'FL', 'b')`)), /permission denied/);
   await assert.rejects(as(null, () => q(`select my_requests()`)), /permission denied/);
   await assert.rejects(as(null, () => q(`select admin_overview()`)), /permission denied/);
+  // signed-out visitors cannot run any internal helper; their only function is the tracking lookup
+  for (const f of ['is_admin()', 'my_role()', 'my_org_id()', 'is_privileged()', `request_org_id(gen_random_uuid())`,
+    `is_request_professional(gen_random_uuid())`, `org_visible_to_me(gen_random_uuid())`, `profile_visible_to_me(gen_random_uuid())`, 'gen_tracking_id()', 'admin_emails()']) {
+    await assert.rejects(as(null, () => q(`select ${f}`)), /permission denied/, `anon call of ${f}`);
+  }
+  assert.equal((await as(null, () => one(`select track_request('C4C-NOPE00', 'x@y.z') as j`))).j, null);
+});
+
+test('every function pins its search path', async () => {
+  const loose = await q(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                         where n.nspname = 'public' and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')`);
+  assert.deepEqual(loose.map(r => r.proname), []);
 });
 
 test('license and insurance details are visible only to their owner and admins', async () => {

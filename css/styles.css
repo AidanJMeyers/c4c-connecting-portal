@@ -44,6 +44,7 @@ button{font-family:inherit;cursor:pointer}
 .tab-btn.active{background:#fff;color:var(--deep-teal-dark)}
 .tab-account{border:1px solid rgba(255,255,255,.7)}
 .demo-banner{background:var(--warn-bg);border-bottom:1px solid #F1D9A6;color:#5E4310;font-size:.84rem;text-align:center;padding:8px 16px}
+.demo-banner.live{background:var(--info-bg);border-bottom-color:var(--info-line);color:#1A4B4D}
 .demo-banner button{background:none;border:none;color:inherit;text-decoration:underline;font-weight:700;padding:0 0 0 6px;font-size:inherit}
 
 section.view{display:none}

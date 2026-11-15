@@ -5,7 +5,8 @@
 (function () {
   "use strict";
   const CFG = window.C4C_CONFIG, COLS = window.C4C_COLS;
-  if (!CFG.supabaseUrl || !CFG.supabaseKey) return;      // demo mode
+  const forcedDemo = /[?&]demo=1\b/.test(location.search), forcedLive = /[?&]live=1\b/.test(location.search);
+  if (!CFG.supabaseUrl || !CFG.supabaseKey || forcedDemo || !(CFG.live || forcedLive)) return;      // demo mode
 
   // Pinned build of the official client, with an integrity hash so a tampered file will not run.
   const LIB = {
@@ -17,7 +18,7 @@
   const listeners = [];
   const emit = event => listeners.forEach(cb => { try { cb(event); } catch (e) { console.error(e); } });
   const pick = (obj, keys) => Object.fromEntries(keys.filter(k => obj && obj[k] !== undefined).map(k => [k, obj[k]]));
-  const here = () => location.origin + location.pathname;
+  const here = () => location.origin + location.pathname + location.search;   // keeps ?live=1 on links in emails
 
   function loadLibrary() {
     return new Promise((resolve, reject) => {
@@ -55,6 +56,7 @@
 
   const api = {
     mode: "supabase",
+    preview: !CFG.live,              // reached with ?live=1 before the public switch is on
     storage: "the C4C database",
 
     async init() {

@@ -157,10 +157,22 @@ create policy surveys_own on event_surveys for all
 create policy surveys_admin on event_surveys for select
   using (is_admin());
 
-create policy news_public on news_posts for select
+create policy news_public on news_posts for select to anon
+  using (published_at is not null and published_at <= now());
+create policy news_select on news_posts for select to authenticated
   using ((published_at is not null and published_at <= now()) or is_admin());
 create policy news_admin on news_posts for all
   using (is_admin()) with check (is_admin());
+
+-- As in the core schema: every policy except the public news one is for signed-in users.
+do $$
+declare p record;
+begin
+  for p in select tablename, policyname from pg_policies
+           where schemaname = 'public' and policyname not in ('professionals_public', 'news_public') loop
+    execute format('alter policy %I on %I to authenticated', p.policyname, p.tablename);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------- impact reporting
 create or replace view impact_by_year with (security_invoker = true) as
@@ -196,5 +208,5 @@ grant select on materials, event_materials, attendee_feedback, event_surveys, ne
                 impact_by_year, top_contributors to authenticated;
 grant insert, update, delete on materials, event_materials, event_surveys, news_posts to authenticated;
 grant execute on function is_event_party(uuid), is_event_presenter(uuid), material_shared_with_me(uuid),
-                          material_usable_by_me(uuid) to anon, authenticated;
+                          material_usable_by_me(uuid) to authenticated;
 grant execute on function submit_attendee_feedback(text, text, int, int, int, text, text) to anon, authenticated;

@@ -137,6 +137,7 @@
     });
     ["reqWindowStart", "reqWindowEnd", "proInsExpires"].forEach(id => { $("#" + id).min = todayStr(); });
 
+    if (B.preview) $("#liveBanner").hidden = false;
     if (DEMO) {
       $("#demoBanner").hidden = false;
       $$(".pw-field").forEach(el => { el.hidden = true; });
