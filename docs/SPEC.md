@@ -122,17 +122,19 @@ When a date is confirmed, an **event page** is created and shared with the organ
 3. **Minimum liability insurance** limits.
 4. **Annual presentation commitment:** required, or encouraged?
 5. **Slide deadline** and reminder timing.
-6. **Admin access to messages:** CC'd on everything, or alerts plus a log?
-7. **Hosting and backend:** see `ROADMAP.md`.
+6. **Admin access to messages:** built as alerts plus a log (admins get a copy of key events and can see every queued email). Say if the board wants to be CC'd on everything instead.
+7. **Outreach contact source:** see section 7.
 
-## 10. Technical needs
+## 10. How it is built
 
-| Need | Proposed |
-|---|---|
-| Accounts and sign-in (email + password and magic link) | Supabase Auth |
-| Database with per-role access rules | Supabase Postgres with row-level security (`db/schema.sql`) |
-| File storage (slides, handouts, headshots, CVs) | Supabase Storage (private buckets with signed links) |
-| Automated email, logged | Resend or Postmark, called from Supabase Edge Functions |
-| Scheduled jobs (reminders, bi-monthly updates, monthly license checks, surveys) | Supabase cron (pg_cron) and Edge Functions |
-| QR codes | Generated per event from the feedback URL |
-| Hosting | GitHub Pages now; a custom domain or subpath under counselorsforchange.org later |
+| Need | Choice | State |
+|---|---|---|
+| Accounts and sign-in (email and password) | Supabase Auth, email confirmation required | Live |
+| Database with per-role access rules | Supabase Postgres with row-level security (`supabase/migrations/`) | Live, tested |
+| Admin access | Allowlist of addresses; admin only after email confirmation | Live |
+| Automated email, logged | Sent from C4C's own Google Workspace mailbox (info@), in a branded layout; every message goes through a queue admins can see | Templates and queue done; sending not set up |
+| Outreach campaigns | Contact list, drafts, test send, queue, unsubscribe | Scaffold live; needs the mail sender |
+| File storage (slides, handouts, headshots, CVs) | Supabase Storage (private, with signed links) | Not built |
+| Scheduled jobs (reminders, check-ins, license rechecks, surveys) | Supabase scheduled functions | Not built |
+| QR codes | Generated per event from the feedback link | Not built |
+| Hosting | GitHub Pages; link from counselorsforchange.org at launch | Live in demo mode |

@@ -1,51 +1,98 @@
-# Connections 4 Change (draft)
+# Connections 4 Change
 
-A Counselors for Change initiative. Live draft: https://aidanjmeyers.github.io/c4c-connecting-portal/
+A Counselors for Change (C4C) initiative. The portal connects verified, licensed mental health professionals with schools and community organizations for panels, workshops and psychoeducation sessions.
 
-This portal connects licensed therapists, counselors and psychologists with schools and community organizations. Through Counselors for Change (C4C) they can arrange panels, workshops, psychoeducation sessions and staff trainings.
+- **Live site (demo mode):** https://aidanjmeyers.github.io/c4c-connecting-portal/
+- **Same site on the real database, for testing:** add `?live=1` to the address
+- **What it should do and why:** [docs/SPEC.md](docs/SPEC.md)
+- **What's left to switch on:** [docs/SETUP.md](docs/SETUP.md)
+- **Plan:** [ROADMAP.md](ROADMAP.md)
 
-> **Status: draft / prototype.** Submissions are saved **only in the browser that submitted them** (localStorage). Visitors on other devices won't see each other's data yet. A shared backend is the next milestone; see [ROADMAP.md](ROADMAP.md).
+## Where things stand
 
-## What it does today
-
-| Area | Features |
+| Piece | State |
 |---|---|
-| **Counselors** | Sign-up form with public and private fields, license info, private liability insurance details, expertise, audiences, session formats, delivery, availability windows and notice period (30 days by default). New profiles wait for admin approval before going public. |
-| **Directory** | Text search, expertise and audience filters, virtual/in-person filter, a "Verified" badge, and a "Request this speaker" button on each profile. |
-| **Schools / orgs** | Request form with a preferred date window (specific times optional), audience, age range, topics, attendee count, CC emails and an optional support tier. No payment is taken. Each request gets a tracking number with a status lookup. |
-| **Connecting** | The presenter gets a private invite link and accepts or declines. If specific times were proposed they pick one, and both sides get Google Calendar and `.ics` links. Otherwise the two are connected to settle the date directly. |
-| **Admin (board)** | Passcode gate, KPI tiles, approve/reject/unlist counselors, top-5 suggested presenters for unmatched requests, request status pipeline, copy confirm links, CSV exports, JSON backup and sample data for demos. |
-| **Privacy** | A draft Privacy & Terms page with a public/private field table. Needs attorney review before launch. |
+| Portal screens | Built and tested in the browser: sign-in, presenter profiles, organization accounts, requests, dashboards for each side, admin, outreach. |
+| Database | Live on Supabase (project `connections-4-change`). Matches the locally tested version exactly; see "Checking the live database" below. |
+| Public site | Runs in **demo mode** (data stays in each visitor's browser) until email sending is set up. `?live=1` uses the real database. |
+| Email sending | **Not set up yet.** Emails are written to a queue that admins can see; nothing is delivered. Templates are done: [docs/email-preview.html](docs/email-preview.html). |
+| Legal wording | Draft. The Privacy & Terms page and the presenter acknowledgment need attorney review before launch. |
 
-## Run it locally
+## How it works
 
-No build step is needed. Open `index.html` in a browser, or serve the folder:
+**Presenters** create an account and profile. License and insurance details are private. C4C admins verify them and approve the profile, which then appears in the public directory. Changing license details sends a live profile back for a re-check.
 
-```bash
-npx serve .
-```
+**Organizations** create one account with a lead contact and optional CC emails. They request a presenter by name from the directory, or describe what they need. Each request gets a tracking number.
 
-The draft admin passcode is `c4c-draft`. Change it in `js/config.js`; instructions are in the file.
+**Connecting.** A presenter requested by name accepts or passes. Otherwise an admin invites the best-fit presenters (ranked suggestions), those who are interested say so, and the organization chooses. Once connected, the two settle the date directly, record it, and get calendar links. After the session the presenter records turnout.
+
+**Admins** review presenters, follow every request, see every queued email, and run outreach campaigns to people who are not on the portal yet.
 
 ## Project layout
 
 ```
-index.html          page markup (all views)
-css/styles.css      C4C brand styles
-js/config.js        site settings + dropdown/chip option lists (edit these)
-js/storage.js       storage adapter: swap this for a real backend
-js/app.js           app logic
-ROADMAP.md          phased feature plan
-docs/SPEC.md        product spec from the 11/15/26 board work session
-db/schema.sql       draft database design for accounts (not yet deployed)
+index.html                      all views
+css/styles.css                  C4C brand styles
+js/config.js                    settings, option lists, Supabase address, live/demo switch
+js/app.js                       views and interactions
+js/backend-demo.js              demo data layer (browser storage, no passwords)
+js/backend-supabase.js          real data layer (same contract as the demo one)
+supabase/migrations/            the database, in order; each file is applied to Supabase
+supabase/drafts/                later-phase tables, tested to load but not deployed
+supabase/functions/_shared/     branded email templates
+supabase/templates/             sign-in emails for Supabase Auth
+supabase/tests/                 automated tests and live-database checks
+docs/                           spec, setup guide, email preview
 ```
 
-## Known limits of the draft
+There is no build step. The site is plain HTML, CSS and JavaScript, served by GitHub Pages from the `main` branch.
 
-- **No shared database.** Data is per-browser, so confirm links only work in the browser that holds the request.
-- **The admin passcode is client-side.** It keeps casual visitors out, but it is not real security. Don't put real license numbers or contact details into a public deployment until the backend and real auth exist.
-- **Email notifications** (EmailJS) are wired in but switched off. To turn them on, fill in `emailjs` in `js/config.js`.
+## Run it locally
+
+```bash
+python -m http.server 8791
+```
+
+Then open http://localhost:8791/. In demo mode, choose "Load sample data" in the yellow banner; the demo admin passcode is `c4c-draft`.
+
+## Tests
+
+The database rules are tested on a real Postgres engine that runs inside Node (PGlite), so no server is needed.
+
+```bash
+cd supabase/tests
+```
+
+```bash
+npm install
+```
+
+```bash
+npm test
+```
+
+The 48 tests cover who can see and change what (for example, that only the owner and admins can read a license number), the request and matching flow, the admin list, outreach rules, and every email template.
+
+## Checking the live database
+
+Two checks confirm that Supabase holds exactly what the tests ran against.
+
+1. **Fingerprint.** Run `node fingerprint.mjs` in `supabase/tests`, then paste `fingerprint.sql` into the Supabase SQL editor. Every row (count and hash) should match.
+2. **Walkthrough.** Paste `live-smoke.sql` into the SQL editor. It signs up test accounts, runs a request through to a confirmed date, checks the privacy rules, and rolls everything back. Success is a message that starts with `SMOKE OK (rolled back)`.
+
+## Changing the database
+
+1. Add a new file to `supabase/migrations/` (never edit one that has been applied).
+2. Add or update tests, and run `npm test`.
+3. Apply the file to Supabase (SQL editor or CLI), then repeat the two checks above.
+
+## Security notes
+
+- `js/config.js` holds the Supabase address and **publishable** key. Both are meant to be public. The secret key and the database password must never go in this repository.
+- Signed-out visitors can do exactly two things with the database: read approved presenter profiles, and look up a request by tracking number plus email.
+- Admin access comes from an allowlist in the database. A listed address becomes an admin only after confirming its email.
+- Internal board material is kept out of this public repository (see `.gitignore`).
 
 ## Credits
 
-The original design and concept come from Stephanie Byrd, MS, LMFT (founder, C4C). Aidan Meyers (Secretary) restructured it for the repo.
+Original concept and design by Stephanie Byrd, MS, LMFT (founder, C4C). Built by Aidan Meyers (Secretary).
