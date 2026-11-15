@@ -18,12 +18,13 @@ const WHO = {
 const GROUPS = [
   ['Presenters', n => WHO[n] === 'Presenter'],
   ['Schools and organizations', n => (WHO[n] || '').startsWith('Organization')],
-  ['C4C admins', n => n.startsWith('admin_')]
+  ['C4C admins', n => n.startsWith('admin_')],
+  ['Outreach invitation (written by an admin in the Outreach tab)', n => n === 'outreach_campaign']
 ];
 
 function card(name, theme) {
   const c = emailContent(name, SAMPLE, OPTS);
-  return `<section class="mail"><div class="meta"><b>${esc(c.subject)}</b><span>To: ${esc(WHO[name] || 'C4C admins')} · template <code>${esc(name)}</code></span></div>
+  return `<section class="mail"><div class="meta"><b>${esc(c.subject)}</b><span>To: ${esc(WHO[name] || (name === 'outreach_campaign' ? 'People not yet on the portal' : 'C4C admins'))} · template <code>${esc(name)}</code></span></div>
     <div class="frame">${bodyHtml(c, theme)}</div></section>`;
 }
 

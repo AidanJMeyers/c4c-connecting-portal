@@ -70,5 +70,22 @@ window.C4C_COLS = {
     "ins_policy_number","ins_limits","ins_expires","commit_annual"],
   organization: ["name","org_type","lead_name","lead_email","cc_emails","prior_contact"],
   request: ["requested_professional_id","event_type","topics","audiences","age_range","attendees_expected","delivery",
-    "location","duration_min","timezone","window_start","window_end","description","support_level"]
+    "location","duration_min","timezone","window_start","window_end","description","support_level"],
+  campaign: ["name","audience","subject","heading","body","button_label","button_path"]
+};
+
+// Starting point for a presenter invitation. Admins edit it in the Outreach tab before sending.
+window.C4C_OUTREACH_STARTER = {
+  name: "Presenter invitation",
+  audience: "professional",
+  subject: "An invitation to share your expertise with local schools",
+  heading: "Share your expertise where it's needed",
+  body: [
+    "Counselors for Change is a nonprofit working to increase mental health awareness and access in our community. We're building Connections 4 Change, a directory that connects licensed mental health professionals with schools and community organizations looking for panelists, workshop leaders and psychoeducation speakers.",
+    "We'd love to have you in it. A verified public profile gives you visibility in your community, and you only ever say yes to the requests that fit your schedule and interests.",
+    "What we ask: a current license, your own professional liability insurance, and a willingness to present about once a year if called. Presenters currently volunteer their time.",
+    "Creating a profile takes about five minutes. Once we've verified your license and insurance, schools and organizations can find you and request you by name."
+  ].join("\n\n"),
+  button_label: "Create my profile",
+  button_path: "#presenters"
 };

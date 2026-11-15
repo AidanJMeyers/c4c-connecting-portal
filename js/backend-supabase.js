@@ -158,8 +158,29 @@
         must(await sb.from("requests").update({ matched_professional_id: professionalId, status: "connected" }).eq("id", id));
       },
       async setRequestStatus(id, status) { must(await sb.from("requests").update({ status }).eq("id", id)); },
-      async removeRequest(id) { must(await sb.from("requests").delete().eq("id", id)); }
-    }
+      async removeRequest(id) { must(await sb.from("requests").delete().eq("id", id)); },
+
+      outreach: {
+        async overview() { return must(await sb.rpc("outreach_overview")); },
+        async importContacts(rows, audience, source) {
+          return must(await sb.rpc("import_outreach_contacts", { p_rows: rows, p_audience: audience, p_source: source }));
+        },
+        async removeContact(id) { must(await sb.from("outreach_contacts").delete().eq("id", id)); },
+        async saveCampaign(c) {
+          const row = pick(c, COLS.campaign);
+          if (c.id) return must(await sb.from("outreach_campaigns").update(row).eq("id", c.id).select().single());
+          return must(await sb.from("outreach_campaigns").insert(Object.assign({ created_by: uid() }, row)).select().single());
+        },
+        async removeCampaign(id) { must(await sb.from("outreach_campaigns").delete().eq("id", id)); },
+        async saveSetting(key, value) {
+          must(await sb.from("app_settings").upsert({ key, value: String(value), updated_at: new Date().toISOString() }));
+        },
+        async queue(id, testOnly) { return must(await sb.rpc("queue_outreach_campaign", { p_campaign_id: id, p_test_only: !!testOnly })); }
+      }
+    },
+
+    // The unsubscribe link in outreach emails. No sign-in needed; the token is the key.
+    async unsubscribe(token) { return must(await sb.rpc("unsubscribe_outreach", { p_token: token })); }
   };
 
   window.C4CSupabaseBackend = api;

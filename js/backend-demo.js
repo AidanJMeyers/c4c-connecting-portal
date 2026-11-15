@@ -13,7 +13,8 @@
   const write = (k, v) => { const s = JSON.stringify(v); if (ls) ls.setItem(P + k, s); else mem.set(k, s); };
 
   const TABLES = ["profiles", "professionals", "professional_private", "organizations", "requests",
-    "request_candidates", "request_history", "events", "email_outbox"];
+    "request_candidates", "request_history", "events", "email_outbox",
+    "outreach_contacts", "outreach_campaigns", "outreach_messages", "app_settings"];
   const db = {};
   const loadAll = () => TABLES.forEach(t => { db[t] = read(t) || []; });
   const persist = () => { TABLES.forEach(t => write(t, db[t])); write("session", sessionId); };
@@ -390,8 +391,103 @@
         mustBeAdmin();
         db.requests = db.requests.filter(r => r.id !== id);
         ["request_candidates", "request_history", "events"].forEach(t => { db[t] = db[t].filter(x => x.request_id !== id); });
-      })
+      }),
+
+      /* ---------- outreach campaigns (mirrors 20261115000004_outreach.sql) ---------- */
+      outreach: {
+        overview: get(() => {
+          mustBeAdmin();
+          const eligible = c => db.outreach_contacts.filter(k => k.audience === c.audience && k.status === "active"
+            && !db.outreach_messages.some(m => m.campaign_id === c.id && m.contact_id === k.id)).length;
+          const count = (c, status) => db.outreach_messages.filter(m => m.campaign_id === c.id
+            && (db.email_outbox.find(o => o.id === m.outbox_id) || {}).status === status).length;
+          return {
+            settings: Object.fromEntries(db.app_settings.map(s => [s.key, s.value])),
+            contacts: db.outreach_contacts.slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
+              .map(k => { const o = Object.assign({}, k); delete o.unsubscribe_token; delete o.added_by; return o; }),
+            campaigns: db.outreach_campaigns.slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).map(c => Object.assign({}, c, {
+              recipients: db.outreach_messages.filter(m => m.campaign_id === c.id).length,
+              sent: count(c, "sent"), failed: count(c, "failed"), eligible: eligible(c) }))
+          };
+        }),
+        importContacts: mut((rows, audience, source) => {
+          const u = mustBeAdmin() && me();
+          if (!String(source || "").trim()) fail("Say where these contacts came from");
+          const out = { added: 0, already_listed: 0, already_members: 0, invalid: 0 };
+          (rows || []).forEach(r => {
+            const email = String(r.email || "").trim().toLowerCase();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { out.invalid++; return; }
+            if (db.outreach_contacts.some(k => k.email === email)) { out.already_listed++; return; }
+            const member = db.profiles.some(p => p.email.toLowerCase() === email);
+            db.outreach_contacts.push({ id: uuid(), email, full_name: String(r.full_name || "").trim() || null, audience,
+              organization: String(r.organization || "").trim() || null, city_state: String(r.city_state || "").trim() || null,
+              source: String(source).trim(), status: member ? "joined" : "active", unsubscribe_token: uuid().replace(/-/g, ""),
+              unsubscribed_at: null, created_at: now(), added_by: u.id });
+            if (member) out.already_members++; else out.added++;
+          });
+          return out;
+        }),
+        removeContact: mut(id => {
+          mustBeAdmin();
+          db.outreach_contacts = db.outreach_contacts.filter(k => k.id !== id);
+          db.outreach_messages = db.outreach_messages.filter(m => m.contact_id !== id);
+        }),
+        saveCampaign: mut(c => {
+          const u = mustBeAdmin() && me(), fields = pick(c, COLS.campaign);
+          if (!(String(fields.subject || "").length >= 5 && fields.subject.length <= 120)) fail("The subject should be between 5 and 120 characters.");
+          let row = c.id && db.outreach_campaigns.find(x => x.id === c.id);
+          if (row) {
+            if (row.status !== "draft") fail("This campaign has already been queued, so its wording can no longer change");
+            Object.assign(row, fields);
+          } else {
+            row = Object.assign({ id: uuid(), audience: "professional", button_label: "Learn more", button_path: "#presenters" }, fields,
+              { status: "draft", created_by: u.id, created_at: now(), queued_at: null });
+            db.outreach_campaigns.push(row);
+          }
+          return row;
+        }),
+        removeCampaign: mut(id => {
+          mustBeAdmin();
+          db.outreach_campaigns = db.outreach_campaigns.filter(c => c.id !== id);
+          db.outreach_messages = db.outreach_messages.filter(m => m.campaign_id !== id);
+        }),
+        saveSetting: mut((key, value) => {
+          mustBeAdmin();
+          const s = db.app_settings.find(x => x.key === key);
+          if (s) Object.assign(s, { value: String(value), updated_at: now() }); else db.app_settings.push({ key, value: String(value), updated_at: now() });
+        }),
+        queue: mut((id, testOnly) => {
+          const u = mustBeAdmin() && me();
+          const c = db.outreach_campaigns.find(x => x.id === id) || fail("Campaign not found");
+          const address = ((db.app_settings.find(s => s.key === "mailing_address") || {}).value || "").trim();
+          if (!address) fail("Add the C4C mailing address first. Outreach emails must show it.");
+          const payload = (k, extra) => Object.assign({ campaign_name: c.name, subject: c.subject, heading: c.heading, body: c.body,
+            button_label: c.button_label, button_path: c.button_path, contact_name: k ? k.full_name : null,
+            source: k ? k.source : "this is a test sent to you", mailing_address: address, unsubscribe_token: k ? k.unsubscribe_token : null }, extra);
+          if (testOnly) { enqueue("outreach_campaign", [u.email], [], payload(null, { subject: "[Test] " + c.subject })); return 1; }
+          if (c.status !== "draft") fail("This campaign has already been queued or cancelled");
+          db.outreach_contacts.forEach(k => { if (k.status === "active" && db.profiles.some(p => p.email.toLowerCase() === k.email)) k.status = "joined"; });
+          let n = 0;
+          db.outreach_contacts.filter(k => k.audience === c.audience && k.status === "active"
+            && !db.outreach_messages.some(m => m.campaign_id === c.id && m.contact_id === k.id)).forEach(k => {
+            enqueue("outreach_campaign", [k.email], [], payload(k));
+            db.outreach_messages.push({ campaign_id: c.id, contact_id: k.id, outbox_id: db.email_outbox[db.email_outbox.length - 1].id, queued_at: now() });
+            n++;
+          });
+          if (!n) fail("No eligible contacts for this campaign");
+          Object.assign(c, { status: "queued", queued_at: now() });
+          return n;
+        })
+      }
     },
+
+    // The unsubscribe link in outreach emails. No sign-in needed; the token is the key.
+    unsubscribe: mut(token => {
+      const k = String(token || "").length >= 32 && db.outreach_contacts.find(x => x.unsubscribe_token === token);
+      if (!k) return false;
+      k.status = "unsubscribed"; k.unsubscribed_at = k.unsubscribed_at || now();
+      return true;
+    }),
 
     /* ---------- demo-only tools ---------- */
     demo: {

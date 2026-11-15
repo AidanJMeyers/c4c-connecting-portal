@@ -166,6 +166,22 @@ const TEMPLATES = {
     facts: [["Tracking number", p.tracking_id]],
     button: { label: "View my account", url: x.account }
   }),
+  /* ----- outreach (written by an admin in the portal; see the Outreach tab) ----- */
+  outreach_campaign: (p, x) => ({
+    subject: p.subject || "An invitation from Counselors for Change",
+    heading: p.heading || "An invitation from Counselors for Change",
+    paragraphs: [
+      ...(p.contact_name ? [`Hi ${firstName(p.contact_name)},`] : []),
+      ...String(p.body || "").split(/\n\s*\n/).map(s => s.trim()).filter(Boolean)
+    ],
+    button: { label: p.button_label || "Learn more", url: x.site + (/^#[a-z]+$/.test(p.button_path || "") ? p.button_path : "#home") },
+    // Required on every outreach email: why you got it, how to stop, and who sent it.
+    outreach: {
+      reason: p.source ? `You're receiving this invitation because ${/^this is a test/.test(p.source) ? p.source : "we found your professional contact details through: " + p.source}.` : "",
+      unsubscribeUrl: p.unsubscribe_token ? `${x.site}#unsubscribe=${p.unsubscribe_token}` : "",
+      address: p.mailing_address || ""
+    }
+  }),
   /* ----- C4C admins ----- */
   admin_new_presenter: (p, x) => ({
     subject: `New presenter to review: ${p.presenter_name}`,
@@ -276,9 +292,14 @@ export function bodyHtml(c, themeName = "house") {
   }
   if (c.note) rows.push(td("12px 32px 4px", `font-size:14px;line-height:20px;color:${t.gray};`, esc(c.note)));
   rows.push(td("20px 32px 26px", "font-size:16px;line-height:24px;color:#222222;", "With gratitude,<br><b>Counselors for Change</b>"));
+  const o = c.outreach;
   rows.push(`<tr><td bgcolor="${t.light}" style="padding:18px 32px;font-family:${FONT};font-size:13px;line-height:19px;color:${t.gray};">` +
-    `Counselors for Change, Inc. &#183; <a href="https://counselorsforchange.org" style="color:${t.gray};">counselorsforchange.org</a><br>` +
-    `Questions? Just reply to this email${c.contactEmail ? ` or write to <a href="mailto:${esc(c.contactEmail)}" style="color:${t.gray};">${esc(c.contactEmail)}</a>` : ""}.</td></tr>`);
+    `Counselors for Change, Inc. &#183; <a href="https://counselorsforchange.org" style="color:${t.gray};">counselorsforchange.org</a>` +
+    (o && o.address ? `<br>${esc(o.address)}` : "") + `<br>` +
+    `Questions? Just reply to this email${c.contactEmail ? ` or write to <a href="mailto:${esc(c.contactEmail)}" style="color:${t.gray};">${esc(c.contactEmail)}</a>` : ""}.` +
+    (o && o.reason ? `<br><br>${esc(o.reason)}` : "") +
+    (o && o.unsubscribeUrl ? ` If you'd rather not hear from us, <a href="${esc(o.unsubscribeUrl)}" style="color:${t.gray};">unsubscribe here</a> and we won't email you again.` : "") +
+    `</td></tr>`);
   return `<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;border:1px solid #dfe5ec;">${rows.join("")}</table>`;
 }
 
@@ -296,7 +317,9 @@ function plainText(c) {
   return [c.heading, "", ...(c.paragraphs || []).flatMap(p => [p, ""]), ...facts, facts.length ? "" : null,
     ...(c.bullets || []).map(b => `- ${b}`), (c.bullets || []).length ? "" : null,
     c.button ? `${c.button.label}: ${c.button.url}` : null, c.button ? "" : null, c.note || null, c.note ? "" : null,
-    "With gratitude,", "Counselors for Change", "counselorsforchange.org"].filter(x => x !== null).join("\n");
+    "With gratitude,", "Counselors for Change", "counselorsforchange.org",
+    ...(c.outreach ? [c.outreach.address || null, "", c.outreach.reason || null,
+      c.outreach.unsubscribeUrl ? `Unsubscribe: ${c.outreach.unsubscribeUrl}` : null] : [])].filter(x => x !== null).join("\n");
 }
 
 export function emailContent(template, payload = {}, opts = {}) {

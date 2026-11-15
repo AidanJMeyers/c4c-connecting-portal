@@ -80,7 +80,7 @@
   }
 
   /* ================= state ================= */
-  const S = { me: null, pro: null, priv: null, org: null, requests: [], directory: [], admin: null,
+  const S = { me: null, pro: null, priv: null, org: null, requests: [], directory: [], admin: null, outreach: null,
     target: null, recovery: false, suggestions: {}, supportTier: null };
   const sel = {};                        // chipset id -> Set of selected values
   const isAdmin = () => !!S.me && S.me.role === "admin";
@@ -158,8 +158,13 @@
   }
 
   /* ================= routing ================= */
-  const VIEWS = ["home", "directory", "presenters", "organizations", "request", "account", "admin", "privacy"];
-  const currentView = () => { const h = location.hash.slice(1); return VIEWS.includes(h) ? h : "home"; };
+  let booted = false;
+  const VIEWS = ["home", "directory", "presenters", "organizations", "request", "account", "admin", "privacy", "unsubscribe"];
+  const currentView = () => {
+    const h = location.hash.slice(1);
+    if (h.startsWith("unsubscribe=")) return "unsubscribe";      // link from an outreach email
+    return VIEWS.includes(h) ? h : "home";
+  };
   function go(view) { if (location.hash === "#" + view) route(); else location.hash = view; }
   function route() {
     const view = currentView();
@@ -169,10 +174,12 @@
     if (view === "organizations") fillOrgForm();
     render(view);
     window.scrollTo({ top: 0 });
+    // Dashboards show other people's activity, so fetch fresh data whenever one is opened.
+    if (booted && S.me && (view === "admin" || view === "account")) refresh();
   }
   function render(view) {
     ({ home: renderHome, directory: renderDirectory, presenters: renderPresenterView, organizations: renderOrgView,
-      request: renderRequestView, account: renderAccount, admin: renderAdmin, privacy: () => {} })[view]();
+      request: renderRequestView, account: renderAccount, admin: renderAdmin, privacy: () => {}, unsubscribe: renderUnsubscribe })[view]();
   }
 
   /* ================= data ================= */
@@ -184,9 +191,11 @@
       jobs.push(guard(B.myProfessional().then(x => { S.pro = x ? x.pro : null; S.priv = x ? x.priv : null; })));
       jobs.push(guard(B.myOrganization().then(o => { S.org = o || null; })));
       jobs.push(guard(B.myRequests().then(r => { S.requests = r || []; })));
-      if (isAdmin()) jobs.push(guard(B.admin.overview().then(a => { S.admin = a; })));
-      else S.admin = null;
-    } else { S.pro = S.priv = S.org = S.admin = null; S.requests = []; }
+      if (isAdmin()) {
+        jobs.push(guard(B.admin.overview().then(a => { S.admin = a; })));
+        jobs.push(guard(B.admin.outreach.overview().then(o => { S.outreach = o; })));
+      } else S.admin = S.outreach = null;
+    } else { S.pro = S.priv = S.org = S.admin = S.outreach = null; S.requests = []; }
     await Promise.all(jobs);
     $("#navAccount").textContent = S.me ? "My account" : "Sign in";
     $("#navAdmin").hidden = !(DEMO || isAdmin());
@@ -714,7 +723,8 @@
     connected_organization: "You're connected (to organization)", connected_presenter: "You're connected (to presenter)", admin_connection: "New connection",
     event_confirmed: "Date confirmed", admin_event_confirmed: "Date confirmed (C4C copy)", event_rescheduled: "Date changed",
     admin_event_rescheduled: "Date changed (C4C copy)", admin_needs_matching: "Request needs matching",
-    request_cancelled: "Request cancelled", admin_request_cancelled: "Request cancelled (C4C copy)"
+    request_cancelled: "Request cancelled", admin_request_cancelled: "Request cancelled (C4C copy)",
+    outreach_campaign: "Outreach invitation"
   };
   function renderAdmin() {
     const gate = $("#adminGate"), panel = $("#adminPanel");
@@ -777,13 +787,136 @@
     $("#emailNote").textContent = DEMO ? "Demo mode: these are the emails the live portal would send. Nothing is delivered."
       : "Messages show as queued until email sending is switched on.";
     $("#adminEmailBody").innerHTML = A.outbox.length ? A.outbox.map(m => {
-      const p = m.payload || {}, about = p.tracking_id ? `${esc(p.tracking_id)} · ${esc(p.org_name || "")}` : esc(p.presenter_name || p.org_name || "");
+      const p = m.payload || {}, about = p.tracking_id ? `${esc(p.tracking_id)} · ${esc(p.org_name || "")}` : esc(p.presenter_name || p.org_name || p.campaign_name || "");
       const status = DEMO ? '<span class="pill neutral">Not sent (demo)</span>' : `<span class="pill ${{ queued: "wait", sent: "good", failed: "bad", skipped: "neutral" }[m.status] || "neutral"}">${esc(m.status)}</span>`;
       return `<tr><td>${esc(new Date(m.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</td>
         <td>${esc(EMAIL_LABEL[m.template] || m.template)}</td>
         <td>${(m.to_emails || []).map(esc).join("<br>")}${(m.cc_emails || []).length ? `<br><span class="hint">cc ${m.cc_emails.map(esc).join(", ")}</span>` : ""}</td>
         <td>${about}</td><td>${status}</td></tr>`;
     }).join("") : `<tr><td colspan="5" class="admin-empty">No emails yet.</td></tr>`;
+    renderOutreach();
+  }
+
+  /* ================= outreach campaigns ================= */
+  const AUDIENCE_LABEL = { professional: "Licensed professionals", organization: "Schools and organizations" };
+  const CONTACT_PILL = { active: ["neutral", "Can be invited"], unsubscribed: ["bad", "Unsubscribed"], bounced: ["bad", "Bounced"], joined: ["good", "Has an account"] };
+  function renderOutreach() {
+    const O = S.outreach;
+    if (!O) return;
+    const addr = $("#outMailingAddress");
+    if (document.activeElement !== addr) addr.value = O.settings.mailing_address || "";
+
+    $("#campaignList").innerHTML = O.campaigns.length ? O.campaigns.map(c => {
+      const draft = c.status === "draft";
+      const btn = (label, act, cls) => `<button type="button" class="${cls || "link-btn"}" data-act="${act}" data-id="${esc(c.id)}" data-name="${esc(c.name)}" data-n="${esc(c.eligible)}">${label}</button>`;
+      return `<article class="req-card${draft ? "" : " closed"}">
+        <div class="req-top"><div><h4 class="req-title">${esc(c.name)}</h4>
+          <div class="req-sub">For ${esc(AUDIENCE_LABEL[c.audience].toLowerCase())} · created ${esc(fmtDate(c.created_at))}${c.queued_at ? " · queued " + esc(fmtDate(c.queued_at)) : ""}</div></div>
+          <span class="pill ${draft ? "wait" : c.status === "queued" ? "good" : "bad"}">${draft ? "Draft" : c.status === "queued" ? "Queued" : "Cancelled"}</span></div>
+        <div class="req-facts">
+          ${fact("Subject", esc(c.subject))}
+          ${draft ? fact("Would go to", `${esc(c.eligible)} contact${c.eligible === 1 ? "" : "s"}`) : fact("Went to", `${esc(c.recipients)} contact${c.recipients === 1 ? "" : "s"}`)}
+          ${draft ? "" : fact("Delivered so far", esc(c.sent) + (c.failed ? ` · ${esc(c.failed)} failed` : ""))}
+        </div>
+        <div class="req-actions">
+          ${draft ? btn("Edit", "camp-edit") : ""}${btn("Preview", "camp-preview")}
+          ${draft ? btn("Send a test to me", "camp-test") + btn(`Queue to ${esc(c.eligible)} contact${c.eligible === 1 ? "" : "s"}`, "camp-queue", "btn btn-primary btn-sm") + btn("Delete", "camp-remove", "link-btn danger") : ""}
+        </div></article>`;
+    }).join("") : `<div class="empty-box">No campaigns yet. Choose "New campaign" to draft your first invitation.</div>`;
+
+    $("#contactBody").innerHTML = O.contacts.length ? O.contacts.map(k => {
+      const [kind, label] = CONTACT_PILL[k.status] || ["neutral", k.status];
+      return `<tr><td><strong>${esc(k.full_name || k.email)}</strong>${k.full_name ? "<br>" + esc(k.email) : ""}${k.organization ? `<br><span class="hint">${esc(k.organization)}</span>` : ""}${k.city_state ? `<br><span class="hint">${esc(k.city_state)}</span>` : ""}</td>
+        <td>${esc(AUDIENCE_LABEL[k.audience])}</td><td>${esc(k.source)}</td><td>${esc(fmtDate(k.created_at))}</td>
+        <td><span class="pill ${kind}">${esc(label)}</span></td>
+        <td><button type="button" class="link-btn danger" data-act="contact-remove" data-id="${esc(k.id)}" data-name="${esc(k.email)}">Remove</button></td></tr>`;
+    }).join("") : `<tr><td colspan="6" class="admin-empty">No contacts yet. Paste a list above to get started.</td></tr>`;
+  }
+
+  const campaignFromForm = () => ({ id: val("campId") || undefined, name: val("campName"), audience: val("campAudience"), subject: val("campSubject"),
+    heading: val("campHeading"), body: $("#campBody").value.trim(), button_label: val("campButtonLabel") || "Learn more", button_path: val("campButtonPath") });
+  function openCampaignForm(c) {
+    c = c || { audience: "professional", button_path: "#presenters" };
+    $("#campId").value = c.id || ""; $("#campName").value = c.name || ""; $("#campAudience").value = c.audience; $("#campSubject").value = c.subject || "";
+    $("#campHeading").value = c.heading || ""; $("#campBody").value = c.body || ""; $("#campButtonLabel").value = c.button_label || ""; $("#campButtonPath").value = c.button_path;
+    showError("campError", ""); $("#campaignForm").hidden = false; $("#campaignForm").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  // Shows exactly what recipients will get, using the same template the mail sender uses.
+  let emailTemplates = null;
+  async function previewCampaign(c) {
+    emailTemplates = emailTemplates || await import("../supabase/functions/_shared/emails.js");
+    const { html } = emailTemplates.renderEmail("outreach_campaign", {
+      subject: c.subject, heading: c.heading, body: c.body, button_label: c.button_label, button_path: c.button_path,
+      contact_name: "Dana Cole, LMFT", source: "(where this contact came from)",
+      mailing_address: (S.outreach.settings.mailing_address || "").trim() || "(add the C4C mailing address above)",
+      unsubscribe_token: "0".repeat(32)
+    }, { siteUrl: location.origin + location.pathname, contactEmail: CFG.contactEmail });
+    $("#campaignPreviewTitle").textContent = `Preview: ${c.subject || "(no subject yet)"}`;
+    $("#campaignPreviewFrame").srcdoc = html;
+    $("#campaignPreview").hidden = false; $("#campaignPreview").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  $("#newCampaignBtn").addEventListener("click", () => openCampaignForm());
+  $("#campCancelBtn").addEventListener("click", () => { $("#campaignForm").hidden = true; });
+  $("#campaignPreviewClose").addEventListener("click", () => { $("#campaignPreview").hidden = true; });
+  $("#campStarterBtn").addEventListener("click", () => {
+    if ($("#campBody").value.trim() && !confirm("Replace what you've written with the starter text?")) return;
+    openCampaignForm(Object.assign({}, window.C4C_OUTREACH_STARTER, { id: val("campId") || undefined }));
+  });
+  $("#campPreviewBtn").addEventListener("click", e => run(e.target, () => previewCampaign(campaignFromForm())));
+  $("#campaignForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const c = campaignFromForm(), missing = [];
+    if (!c.name) missing.push("a campaign name");
+    if (c.subject.length < 5) missing.push("an email subject");
+    if (!c.heading) missing.push("a heading");
+    if (!c.body) missing.push("a message");
+    if (missing.length) return showError("campError", "Please add: " + missing.join(", ") + ".");
+    showError("campError", "");
+    await run(e.target.querySelector("[type=submit]"), async () => {
+      await B.admin.outreach.saveCampaign(c);
+      $("#campaignForm").hidden = true; await refresh(); toast("Draft saved. Send yourself a test before queueing it.");
+    });
+  });
+  $("#outreachSettingsForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    await run(e.target.querySelector("[type=submit]"), async () => {
+      await B.admin.outreach.saveSetting("mailing_address", val("outMailingAddress")); await refresh(); toast("Mailing address saved.");
+    });
+  });
+  $("#importForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const source = val("impSource");
+    const rows = $("#impRows").value.split(/\r?\n/).map(l => l.trim()).filter(l => l && !/^e-?mail\b/i.test(l)).map(line => {
+      const parts = line.split(/[,;\t]/).map(p => p.trim()).filter(Boolean);
+      const at = parts.findIndex(p => p.includes("@"));
+      const email = at >= 0 ? parts.splice(at, 1)[0].replace(/^.*<|>.*$/g, "") : parts.shift() || "";
+      return { email, full_name: parts[0] || "", organization: parts[1] || "", city_state: parts.slice(2).join(", ") };
+    });
+    if (!source) return showError("impError", "Say where these contacts came from, so C4C has a record.");
+    if (!rows.length) return showError("impError", "Paste at least one contact.");
+    showError("impError", "");
+    await run(e.target.querySelector("[type=submit]"), async () => {
+      const r = await B.admin.outreach.importContacts(rows, val("impAudience"), source);
+      const bits = [`${r.added} added`];
+      if (r.already_members) bits.push(`${r.already_members} already have an account`);
+      if (r.already_listed) bits.push(`${r.already_listed} already on the list`);
+      if (r.invalid) bits.push(`${r.invalid} skipped (not a valid email)`);
+      $("#impRows").value = ""; await refresh();
+      const out = $("#impResult"); out.hidden = false; out.textContent = bits.join(" · ") + ".";
+    });
+  });
+  $("#exportContactsBtn").addEventListener("click", () => download(toCSV(S.outreach.contacts, [
+    ["Email", k => k.email], ["Name", k => k.full_name], ["Organization", k => k.organization], ["City/State", k => k.city_state],
+    ["Type", k => AUDIENCE_LABEL[k.audience]], ["Where From", k => k.source], ["Status", k => k.status], ["Added", k => k.created_at], ["Unsubscribed", k => k.unsubscribed_at]
+  ]), "c4c-outreach-contacts.csv", "text/csv"));
+
+  /* ---- unsubscribe page (reached from the link in an outreach email) ---- */
+  function renderUnsubscribe() {
+    const token = (/^#unsubscribe=([0-9a-f]{32})$/i.exec(location.hash) || [])[1];
+    $("#unsubscribeBox").innerHTML = token
+      ? `<h3>Stop these emails?</h3><p>Counselors for Change will no longer send invitation emails to your address.</p>
+         <div class="btn-row"><button type="button" class="btn btn-primary" data-act="unsubscribe" data-token="${esc(token)}">Yes, unsubscribe me</button></div>`
+      : `<h3>This link isn't complete</h3><p>Please use the unsubscribe link from the email again, or write to ${mailto(CFG.contactEmail)} and we'll take you off the list.</p>`;
   }
 
   /* ---- CSV exports ---- */
@@ -860,7 +993,23 @@
     "pro-suspend": async d => { if (!confirm(`Pause ${d.name}? Their profile is hidden from the directory until you approve it again.`)) return; await B.admin.setProfessionalStatus(d.id, "suspended"); await refresh(); },
     "ins-verify": async d => { await B.admin.setInsuranceVerified(d.id, true); await refresh(); },
     "ins-unverify": async d => { await B.admin.setInsuranceVerified(d.id, false); await refresh(); },
-    "pro-remove": async d => { if (!confirm(`Permanently remove ${d.name}'s presenter profile? This can't be undone. Their sign-in stays.`)) return; await B.admin.removeProfessional(d.id); await refresh(); toast("Profile removed."); }
+    "pro-remove": async d => { if (!confirm(`Permanently remove ${d.name}'s presenter profile? This can't be undone. Their sign-in stays.`)) return; await B.admin.removeProfessional(d.id); await refresh(); toast("Profile removed."); },
+    "camp-edit": async d => openCampaignForm(S.outreach.campaigns.find(c => c.id === d.id)),
+    "camp-preview": async d => previewCampaign(S.outreach.campaigns.find(c => c.id === d.id)),
+    "camp-test": async d => { await B.admin.outreach.queue(d.id, true); await refresh(); toast(`A test of "${d.name}" was queued to ${S.me.email}. It appears in the Emails tab.`); },
+    "camp-queue": async d => {
+      if (d.n === "0") return toast("There are no eligible contacts for this campaign yet. Add contacts below first.", "error");
+      if (!confirm(`Queue "${d.name}" to ${d.n} contact${d.n === "1" ? "" : "s"}?\n\nEach one gets this email once. After this the wording is locked and it can't be recalled.`)) return;
+      const n = await B.admin.outreach.queue(d.id, false); await refresh(); toast(`Queued to ${n} contact${n === 1 ? "" : "s"}.`);
+    },
+    "camp-remove": async d => { if (!confirm(`Delete the draft "${d.name}"?`)) return; await B.admin.outreach.removeCampaign(d.id); await refresh(); },
+    "contact-remove": async d => { if (!confirm(`Remove ${d.name} from the contact list?`)) return; await B.admin.outreach.removeContact(d.id); await refresh(); },
+    "unsubscribe": async d => {
+      const ok = await B.unsubscribe(d.token);
+      $("#unsubscribeBox").innerHTML = ok
+        ? `<h3>You're unsubscribed</h3><p>You won't get any more invitation emails from Counselors for Change. If you ever want to join, you're always welcome.</p>`
+        : `<h3>We couldn't find that link</h3><p>It may have been mistyped. Write to ${mailto(CFG.contactEmail)} and we'll take you off the list.</p>`;
+    }
   };
   document.addEventListener("click", e => {
     const el = e.target.closest("[data-act]");
@@ -916,6 +1065,7 @@
       history.replaceState(null, "", location.pathname + "#account");
     }
     route();
+    booted = true;
     await submitDraftIfAny();
   })();
 })();

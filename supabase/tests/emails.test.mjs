@@ -13,7 +13,7 @@ const OPTS = { siteUrl: 'https://portal.example/', contactEmail: 'info@counselor
 
 test('every template the database queues has a branded email', () => {
   const sql = readdirSync(path.join(here, '..', 'migrations')).map(f => readFileSync(path.join(here, '..', 'migrations', f), 'utf8')).join('\n');
-  const queued = new Set([...sql.matchAll(/enqueue_email\('([a-z_]+)'/g)].map(m => m[1]));
+  const queued = new Set([...sql.matchAll(/enqueue_email(?:_id)?\('([a-z_]+)'/g)].map(m => m[1]));
   assert.ok(queued.size >= 20, `found ${queued.size} queued templates`);
   for (const name of queued) assert.ok(TEMPLATE_NAMES.includes(name), `missing template: ${name}`);
   for (const name of TEMPLATE_NAMES) assert.ok(queued.has(name), `template is never queued: ${name}`);
@@ -28,11 +28,25 @@ test('each email renders with a subject, the logo, a working button and no lefto
       assert.ok(!out.includes('—'), `${name}: contains an em dash`);
     }
     assert.ok(html.includes('cropped-c4clogo1.png') && html.includes('width="260"') && html.includes('height="98"'), `${name}: logo`);
-    assert.match(html, /href="https:\/\/portal\.example\/#(account|admin|request)"/, `${name}: button link`);
+    assert.match(html, /href="https:\/\/portal\.example\/#(account|admin|request|presenters)"/, `${name}: button link`);
     assert.ok(html.includes('CONNECTIONS 4 CHANGE') && html.includes('counselorsforchange.org'), `${name}: branding`);
     assert.ok(!/<style[^>]*>(?![^<]*mso)/.test(html.replace(/<!--\[if mso\]>.*?<!\[endif\]-->/s, '')), `${name}: inline styles only`);
     assert.ok(text.includes('Counselors for Change'), `${name}: plain-text version`);
   }
+});
+
+test('outreach emails always say why, how to stop, and who sent them', () => {
+  const { html, text, subject } = renderEmail('outreach_campaign', SAMPLE, OPTS);
+  assert.equal(subject, SAMPLE.subject);
+  assert.ok(html.includes(`href="https://portal.example/#unsubscribe=${SAMPLE.unsubscribe_token}"`), 'unsubscribe link');
+  assert.ok(html.includes('123 Example St, Melbourne, FL 32901'), 'mailing address');
+  assert.ok(html.includes('Florida DOH public license list'), 'where the address came from');
+  assert.ok(html.includes('Hi Dana,') && html.includes('Second paragraph.'), 'greeting and paragraphs');
+  assert.ok(text.includes('Unsubscribe: https://portal.example/#unsubscribe='), 'plain-text unsubscribe');
+  // a test send to an admin has no contact behind it, so no unsubscribe link, and a made-up button target falls back to the home page
+  const t = renderEmail('outreach_campaign', { ...SAMPLE, unsubscribe_token: null, contact_name: null, source: 'this is a test sent to you', button_path: 'javascript:alert(1)' }, OPTS);
+  assert.ok(!t.html.includes('#unsubscribe=') && t.html.includes('this is a test sent to you'));
+  assert.ok(t.html.includes('href="https://portal.example/#home"') && !t.html.includes('javascript:'));
 });
 
 test('session emails show the date in the request’s own timezone', () => {

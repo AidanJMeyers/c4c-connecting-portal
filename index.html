@@ -380,6 +380,7 @@
         <button type="button" role="tab" aria-selected="true" data-admin-tab="presenters">Presenters</button>
         <button type="button" role="tab" aria-selected="false" data-admin-tab="requests">Requests</button>
         <button type="button" role="tab" aria-selected="false" data-admin-tab="organizations">Organizations</button>
+        <button type="button" role="tab" aria-selected="false" data-admin-tab="outreach">Outreach</button>
         <button type="button" role="tab" aria-selected="false" data-admin-tab="emails">Emails</button>
         <button type="button" role="tab" aria-selected="false" data-admin-tab="data" id="adminDataTab" hidden>Demo data</button>
       </div>
@@ -413,6 +414,64 @@
         <div class="table-wrap"><table class="admin-table"><thead><tr><th>Organization</th><th>Lead contact</th><th>Also copied</th><th>Joined</th><th>Notes</th></tr></thead><tbody id="adminOrgBody"></tbody></table></div>
       </div>
 
+      <div data-admin-panel="outreach" hidden>
+        <div class="admin-toolbar"><h3>Outreach</h3><span class="hint">Invite people who aren't on the portal yet. Nothing is sent until you queue a campaign.</span></div>
+
+        <div class="card outreach-card">
+          <h4>Before you send</h4>
+          <ul class="plain-list">
+            <li>Only add contacts whose details were shared with C4C or are published for professional contact, and note where each batch came from.</li>
+            <li>Every outreach email shows why the person received it, an unsubscribe link and C4C's mailing address. Unsubscribes are honored automatically.</li>
+            <li>Send yourself a test first. Once a campaign is queued, its wording is locked.</li>
+          </ul>
+          <form id="outreachSettingsForm" class="inline-form">
+            <div class="field grow"><label for="outMailingAddress">C4C mailing address (shown at the bottom of every outreach email) *</label><input type="text" id="outMailingAddress" placeholder="Street, city, state, ZIP"></div>
+            <button type="submit" class="btn btn-outline btn-sm">Save address</button>
+          </form>
+        </div>
+
+        <div class="admin-toolbar"><h3 class="sub">Campaigns</h3><button type="button" class="btn btn-primary btn-sm" id="newCampaignBtn">New campaign</button></div>
+        <form id="campaignForm" class="card outreach-card" hidden novalidate>
+          <input type="hidden" id="campId">
+          <div class="row2">
+            <div class="field"><label for="campName">Campaign name (only you see this) *</label><input type="text" id="campName"></div>
+            <div class="field"><label for="campAudience">Who it's for</label><select id="campAudience"><option value="professional">Licensed professionals</option><option value="organization">Schools and organizations</option></select></div>
+          </div>
+          <div class="field"><label for="campSubject">Email subject *</label><input type="text" id="campSubject" maxlength="120"></div>
+          <div class="field"><label for="campHeading">Heading inside the email *</label><input type="text" id="campHeading"></div>
+          <div class="field"><label for="campBody">Message *</label><textarea id="campBody" rows="9"></textarea><div class="hint">Leave a blank line between paragraphs. The greeting, sign-off, unsubscribe link and address are added for you.</div></div>
+          <div class="row2">
+            <div class="field"><label for="campButtonLabel">Button text</label><input type="text" id="campButtonLabel" maxlength="40"></div>
+            <div class="field"><label for="campButtonPath">Button opens</label><select id="campButtonPath"><option value="#presenters">Presenter sign-up</option><option value="#organizations">Organization sign-up</option><option value="#directory">The directory</option><option value="#home">Home page</option></select></div>
+          </div>
+          <div class="error-text" id="campError" role="alert"></div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary btn-sm">Save draft</button>
+            <button type="button" class="btn btn-outline btn-sm" id="campStarterBtn">Use starter text</button>
+            <button type="button" class="btn btn-outline btn-sm" id="campPreviewBtn">Preview</button>
+            <button type="button" class="link-btn" id="campCancelBtn">Close</button>
+          </div>
+        </form>
+        <div id="campaignPreview" class="card outreach-card" hidden>
+          <div class="dash-head"><h4 id="campaignPreviewTitle">Preview</h4><button type="button" class="link-btn" id="campaignPreviewClose">Close preview</button></div>
+          <iframe id="campaignPreviewFrame" title="Email preview" sandbox=""></iframe>
+        </div>
+        <div id="campaignList" class="request-list"></div>
+
+        <div class="admin-toolbar" style="margin-top:36px"><h3 class="sub">Contacts</h3><button type="button" class="btn btn-outline btn-sm" id="exportContactsBtn">Export CSV</button></div>
+        <form id="importForm" class="card outreach-card" novalidate>
+          <div class="row2">
+            <div class="field"><label for="impAudience">These contacts are</label><select id="impAudience"><option value="professional">Licensed professionals</option><option value="organization">Schools and organizations</option></select></div>
+            <div class="field"><label for="impSource">Where they came from *</label><input type="text" id="impSource" placeholder="e.g. State license lookup, AFSP walk sign-in sheet"></div>
+          </div>
+          <div class="field"><label for="impRows">Paste contacts, one per line *</label><textarea id="impRows" rows="5" placeholder="email, name, practice or school, city&#10;dana@example.org, Dana Cole LMFT, Cole Counseling, Melbourne FL"></textarea><div class="hint">Only the email is required. Duplicates, typos and people who already have an account are sorted out for you.</div></div>
+          <div class="error-text" id="impError" role="alert"></div>
+          <div class="notice" id="impResult" hidden></div>
+          <button type="submit" class="btn btn-outline btn-sm">Add contacts</button>
+        </form>
+        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Contact</th><th>Type</th><th>Where from</th><th>Added</th><th>Status</th><th></th></tr></thead><tbody id="contactBody"></tbody></table></div>
+      </div>
+
       <div data-admin-panel="emails" hidden>
         <div class="admin-toolbar"><h3>Emails</h3><span class="hint" id="emailNote"></span></div>
         <div class="table-wrap"><table class="admin-table"><thead><tr><th>When</th><th>Message</th><th>To</th><th>About</th><th>Status</th></tr></thead><tbody id="adminEmailBody"></tbody></table></div>
@@ -430,6 +489,13 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ============================== UNSUBSCRIBE ============================== -->
+<section id="unsubscribe" class="view">
+  <div class="container narrow" style="padding-top:56px;padding-bottom:80px">
+    <div class="card gate" id="unsubscribeBox"></div>
   </div>
 </section>
 
