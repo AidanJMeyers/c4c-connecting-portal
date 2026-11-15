@@ -46,12 +46,23 @@ In Supabase: Authentication, Emails, Templates. For each of the four templates, 
 
 The subject is on the first line of each file.
 
-Then in Authentication, URL Configuration, set **Site URL** to the portal address and add it under **Redirect URLs**. While testing with `?live=1`, also add the address with `?live=1` on the end.
+### 2b. Where email links should land (required)
+
+Supabase starts every project with the site address set to `http://localhost:3000`. Until this is changed, the link in a confirmation or password-reset email sends people to a page that does not exist.
+
+In Supabase: Authentication, URL Configuration.
+
+- **Site URL:** `https://aidanjmeyers.github.io/c4c-connecting-portal/`
+- **Redirect URLs**, add both:
+  - `https://aidanjmeyers.github.io/c4c-connecting-portal/**` (covers the address with `?live=1` on the end)
+  - `http://localhost:8791/**` (for testing on your own computer)
+
+When the portal moves to its final address, update both.
 
 ### 3. First sign-in and a live test
 
-1. Open the portal with `?live=1` and create an account with an address on the admin list.
-2. Confirm the email. The Admin tab should appear.
+1. Open the portal with `?live=1`, go to Sign in, and open "C4C board or staff? Create your sign-in". Use an address on the admin list.
+2. Confirm the email. You land on your account page and the Admin tab appears.
 3. Create a second account as a presenter and a third as an organization (any addresses you control), and run one request through: approve the presenter, request them, accept, set a date.
 4. In the Admin tab, check the Emails list. Each step should have queued the right messages.
 
