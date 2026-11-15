@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.env
+.env.*
+# internal board material — repo is public
+docs/proposed-features-from-minutes.md
+docs/internal/
+# exported data never belongs in the repo
+c4c-*.csv
+c4c-portal-backup.json
