@@ -8,7 +8,13 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%230E7BAE' d='M48 12 L68 12 L38 51 L18 51 Z'/%3E%3Cpath fill='%230E7BAE' d='M53 30 L73 30 L73 93 L53 93 Z'/%3E%3Cpath fill='%2323B2BB' d='M10 51 L68 51 L68 42 L92 63 L68 84 L68 73 L10 73 Z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,900;1,600;1,700;1,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+<!-- Bump the ?v= number on the stylesheet and the four scripts below whenever any of them changes,
+     so browsers never pair a new page with old cached code. -->
+<link rel="stylesheet" href="css/styles.css?v=5">
+<script>
+  // The portal handles every form in JavaScript. If a script ever fails to load, do nothing rather than reload the page.
+  document.addEventListener("submit", function (e) { e.preventDefault(); }, true);
+</script>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -574,9 +580,9 @@
 </footer>
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
-<script src="js/config.js"></script>
-<script src="js/backend-demo.js"></script>
-<script src="js/backend-supabase.js"></script>
-<script src="js/app.js"></script>
+<script src="js/config.js?v=5"></script>
+<script src="js/backend-demo.js?v=5"></script>
+<script src="js/backend-supabase.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

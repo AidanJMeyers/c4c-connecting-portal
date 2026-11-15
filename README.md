@@ -47,6 +47,8 @@ docs/                           spec, setup guide, email preview
 
 There is no build step. The site is plain HTML, CSS and JavaScript, served by GitHub Pages from the `main` branch.
 
+**When you change any script or the stylesheet,** bump the `?v=` number on the five asset tags in `index.html`. Browsers cache those files for a few minutes, and the number keeps a new page from running old code.
+
 ## Run it locally
 
 ```bash
