@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connections 4 Change · Counselors for Change</title>
-<meta name="description" content="Connections 4 Change, by Counselors for Change, connects licensed therapists, counselors and psychologists with schools and organizations for panels, workshops and psychoeducation.">
+<meta name="description" content="Connections 4 Change, by Counselors for Change, connects verified, licensed mental health professionals with schools and community organizations for panels, workshops and psychoeducation.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%230E7BAE' d='M48 12 L68 12 L38 51 L18 51 Z'/%3E%3Cpath fill='%230E7BAE' d='M53 30 L73 30 L73 93 L53 93 Z'/%3E%3Cpath fill='%2323B2BB' d='M10 51 L68 51 L68 42 L92 63 L68 84 L68 73 L10 73 Z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,900;1,600;1,700;1,900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<!-- Reusable "4" brand mark -->
+<a class="skip-link" href="#main">Skip to content</a>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="four-mark" viewBox="0 0 100 100">
     <path fill="#0E7BAE" d="M 48 12 L 68 12 L 38 51 L 18 51 Z"/>
@@ -20,46 +20,48 @@
   </symbol>
 </svg>
 
-<nav class="nav" aria-label="Main">
+<header class="nav">
   <div class="nav-top">
-    <a href="#home" class="brand" data-tab="home" aria-label="Connections 4 Change home">
+    <a href="#home" class="brand" aria-label="Connections 4 Change home">
       <span class="nav-mark" aria-hidden="true"><svg><use href="#four-mark"/></svg></span>
       <span class="wordmark">Connections 4 Change<small>by Counselors for Change</small></span>
     </a>
   </div>
-  <div class="nav-bottom">
-    <div class="tabs" role="tablist">
-      <button class="tab-btn active" data-tab="home">Home</button>
-      <button class="tab-btn" data-tab="join">Join the Directory</button>
-      <button class="tab-btn" data-tab="directory">Browse Directory</button>
-      <button class="tab-btn" data-tab="request">Request a Speaker</button>
-      <button class="tab-btn" data-tab="privacy">Privacy &amp; Terms</button>
-      <button class="tab-btn" data-tab="admin" style="position:relative">Admin<span id="adminBadge" class="admin-badge" hidden></span></button>
+  <nav class="nav-bottom" aria-label="Main">
+    <div class="tabs">
+      <a class="tab-btn" href="#home" data-view="home">Home</a>
+      <a class="tab-btn" href="#directory" data-view="directory">Find a Presenter</a>
+      <a class="tab-btn" href="#presenters" data-view="presenters">For Presenters</a>
+      <a class="tab-btn" href="#organizations" data-view="organizations request">For Schools &amp; Organizations</a>
+      <a class="tab-btn" href="#privacy" data-view="privacy">Privacy &amp; Terms</a>
+      <a class="tab-btn tab-account" href="#account" data-view="account" id="navAccount">Sign in</a>
+      <a class="tab-btn" href="#admin" data-view="admin" id="navAdmin" hidden>Admin</a>
     </div>
-  </div>
-</nav>
+  </nav>
+</header>
 <div class="demo-banner" id="demoBanner" hidden>
-  Draft preview — submissions are saved only in this browser. <button type="button" id="seedBtn">Load sample counselors</button>
+  <strong>Demo mode.</strong> Nothing is sent anywhere and data stays in this browser, so please don't enter real personal details.
+  <button type="button" id="seedBtn">Load sample data</button>
 </div>
 
-<main>
-<!-- HOME -->
-<section id="home" class="view active">
+<main id="main">
+<!-- ============================== HOME ============================== -->
+<section id="home" class="view">
   <div class="hero">
     <svg class="hero-watermark" aria-hidden="true"><use href="#four-mark"/></svg>
     <div class="container hero-grid">
       <div>
         <div class="eyebrow">Licensed therapists · Counselors · Psychologists</div>
         <h1>Counselors ready.<br>Communities waiting.<br><em>Let's connect them.</em></h1>
-        <p class="lead">Connections 4 Change is a Counselors for Change initiative. It connects verified, licensed mental health professionals with schools and community organizations looking for panelists, workshop facilitators and psychoeducation speakers. You browse, choose and connect directly.</p>
+        <p class="lead">Connections 4 Change is a Counselors for Change initiative. It connects verified, licensed mental health professionals with schools and community organizations looking for panelists, workshop leaders and psychoeducation speakers. You browse, choose and connect directly.</p>
         <div class="cta-row">
-          <button class="btn btn-primary" data-tab="join">I'm a counselor</button>
-          <button class="btn btn-outline" data-tab="request">I'm a school or organization</button>
+          <a class="btn btn-primary" href="#presenters">I'm a licensed professional</a>
+          <a class="btn btn-outline" href="#organizations">I'm a school or organization</a>
         </div>
       </div>
       <div class="match-visual" aria-hidden="true">
         <div class="match-card card-a">
-          <div class="who">Counselor</div>
+          <div class="who">Presenter</div>
           <div class="name">Licensed counselor</div>
           <span class="chip lit">Anxiety &amp; Stress</span><span class="chip">Grief &amp; Loss</span><span class="chip lit">Youth Mental Health</span>
         </div>
@@ -68,220 +70,191 @@
           <div class="name">Local middle school</div>
           <span class="chip lit">Youth Mental Health</span><span class="chip">Parent Workshop</span><span class="chip lit">Anxiety &amp; Stress</span>
         </div>
-        <div class="match-badge">✓ It's a match</div>
+        <div class="match-badge">✓ Connected</div>
       </div>
     </div>
   </div>
   <div class="stats">
     <div class="container stats-inner">
-      <div class="stat"><b id="statCounselors">0</b><span>Counselors listed</span></div>
-      <div class="stat"><b id="statRequests">0</b><span>Speaking requests</span></div>
+      <div class="stat"><b id="statPresenters">0</b><span>Verified presenters</span></div>
       <div class="stat"><b id="statExpertise">0</b><span>Areas of expertise</span></div>
+      <div class="stat"><b id="statAudiences">0</b><span>Audiences served</span></div>
     </div>
   </div>
   <div class="container how">
-    <h2>How the match works</h2>
-    <p class="sub">Three steps connect a licensed professional to the room that needs them most.</p>
+    <h2>How it works</h2>
+    <p class="sub">Three steps connect a licensed professional to the room that needs them.</p>
     <div class="steps">
-      <div class="step"><svg class="step-mark" aria-hidden="true"><use href="#four-mark"/></svg><div class="num">01</div><h3>Create a profile</h3><p>Counselors list their license, expertise and the audiences they're best suited to. C4C verifies the license before the profile goes live.</p></div>
-      <div class="step"><svg class="step-mark" aria-hidden="true"><use href="#four-mark"/></svg><div class="num">02</div><h3>Organizations search</h3><p>Schools and nonprofits filter the directory by topic and audience, then propose two or three dates.</p></div>
-      <div class="step"><svg class="step-mark" aria-hidden="true"><use href="#four-mark"/></svg><div class="num">03</div><h3>Confirm and give back</h3><p>The counselor picks a time and both sides get calendar links. A donation at any level supports the mission.</p></div>
+      <div class="step"><svg class="step-mark" aria-hidden="true"><use href="#four-mark"/></svg><div class="num">01</div><h3>Presenters join</h3><p>Licensed professionals create a profile with their expertise and the audiences they serve. C4C verifies the license and insurance before the profile goes live.</p></div>
+      <div class="step"><svg class="step-mark" aria-hidden="true"><use href="#four-mark"/></svg><div class="num">02</div><h3>Organizations ask</h3><p>Schools and organizations browse the directory and request a presenter, or tell us what they need and C4C suggests the best fits.</p></div>
+      <div class="step"><svg class="step-mark" aria-hidden="true"><use href="#four-mark"/></svg><div class="num">03</div><h3>Connect directly</h3><p>Once a presenter says yes, both sides are introduced, settle the date together and get calendar links. C4C stays in the loop to help.</p></div>
     </div>
   </div>
   <div class="container split">
     <div class="split-card">
       <svg class="card-mark" aria-hidden="true"><use href="#four-mark"/></svg>
-      <h3>For licensed counselors</h3>
-      <p>Share your expertise where it's needed. Set your own topics, audiences and availability, and organizations come to you.</p>
-      <button class="btn btn-outline btn-block" data-tab="join">Join the directory</button>
+      <h3>For licensed professionals</h3>
+      <p>Share your expertise where it's needed. Gain visibility in your community, use C4C's slide template and resources, and give back on your own schedule.</p>
+      <a class="btn btn-outline btn-block" href="#presenters">Join as a presenter</a>
     </div>
     <div class="split-card dark">
       <svg class="card-mark" aria-hidden="true"><use href="#four-mark"/></svg>
       <h3>For schools &amp; organizations</h3>
-      <p>Browse verified profiles and request a panelist, workshop leader or psychoeducation speaker in minutes.</p>
-      <button class="btn btn-gold btn-block" data-tab="directory">Browse the directory</button>
+      <p>Find a verified professional for your panel, workshop, assembly or staff training, and track your request from start to finish.</p>
+      <a class="btn btn-gold btn-block" href="#directory">Find a presenter</a>
     </div>
   </div>
 </section>
 
-<!-- JOIN -->
-<section id="join" class="view">
-  <div class="container page-head">
-    <div class="eyebrow">For licensed professionals</div>
-    <h2>Join the speaker directory</h2>
-    <p>Tell organizations what you offer. After C4C verifies your license, your profile appears in the public directory so schools, nonprofits and workplaces can request you.</p>
-  </div>
-  <div class="container form-wrap">
-    <div class="card">
-      <div class="notice" id="volNotice" role="status"></div>
-      <form id="volForm" novalidate>
-        <div class="row2">
-          <div class="field"><label for="volName">Full name * <span class="field-flag pub">Public</span></label><input type="text" id="volName" autocomplete="name" required></div>
-          <div class="field"><label for="volEmail">Email * <span class="field-flag priv">Private</span></label><input type="email" id="volEmail" autocomplete="email" required></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label for="volPhone">Phone <span class="field-flag priv">Private</span></label><input type="tel" id="volPhone" autocomplete="tel"></div>
-          <div class="field"><label for="volLocation">City &amp; state <span class="field-flag pub">Public</span></label><input type="text" id="volLocation" placeholder="e.g. Melbourne, FL"></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label for="volLicenseType">License type * <span class="field-flag pub">Public</span></label><select id="volLicenseType" required></select></div>
-          <div class="field"><label for="volLicenseState">Licensed in state * <span class="field-flag pub">Public</span></label><input type="text" id="volLicenseState" maxlength="2" placeholder="FL" required></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label for="volLicenseNum">License number * <span class="field-flag priv">Private</span></label><input type="text" id="volLicenseNum" required><div class="hint">Used only to verify your license. Never shown publicly.</div></div>
-          <div class="field"><label for="volYears">Years practicing <span class="field-flag priv">Private</span></label><input type="number" id="volYears" min="0" max="60"></div>
-        </div>
-        <div class="field"><span class="label">Areas of expertise * <span class="field-flag pub">Public</span></span><div class="chipset" id="volExpertise" data-options="EXPERTISE"></div></div>
-        <div class="field"><span class="label">Audiences you're comfortable speaking with * <span class="field-flag pub">Public</span></span><div class="chipset" id="volAudience" data-options="AUDIENCES"></div></div>
-        <div class="field"><span class="label">Session formats you offer <span class="field-flag pub">Public</span></span><div class="chipset" id="volEventTypes" data-options="EVENT_TYPES"></div></div>
-        <div class="field"><span class="label">Delivery <span class="field-flag pub">Public</span></span><div class="chipset" id="volFormat" data-options="FORMATS"></div></div>
-        <div class="field"><span class="label">General availability <span class="field-flag pub">Public</span></span><div class="chipset" id="volAvailability" data-options="AVAILABILITY"></div><div class="hint">Organizations propose specific times inside these windows.</div></div>
-        <div class="row2">
-          <div class="field"><label for="volTimezone">Your timezone <span class="field-flag priv">Private</span></label><select id="volTimezone" class="tz-select"></select></div>
-          <div class="field"><label for="volLeadTime">Minimum days' notice <span class="field-flag priv">Private</span></label><input type="number" id="volLeadTime" min="1" max="180" value="30"></div>
-        </div>
-        <div class="field"><label for="volBio">Short bio * <span class="field-flag pub">Public</span></label><textarea id="volBio" maxlength="800" required placeholder="A few sentences organizations will see on your public profile."></textarea></div>
-        <div class="field"><label for="volWebsite">Practice website or Psychology Today profile <span class="field-flag pub">Public</span></label><input type="text" id="volWebsite" placeholder="https://"><div class="hint">Optional. Helps organizations learn more and helps us verify your license.</div></div>
-
-        <fieldset class="subsection">
-          <legend>Professional liability insurance <span class="field-flag priv">Private</span></legend>
-          <p class="hint">Required. C4C's insurance does not cover presenters, so you'll present under your own policy. These details are seen only by C4C, and are shared with a host organization only if it asks.</p>
-          <div class="row2">
-            <div class="field"><label for="volInsCarrier">Carrier *</label><input type="text" id="volInsCarrier"></div>
-            <div class="field"><label for="volInsPolicy">Policy number *</label><input type="text" id="volInsPolicy"></div>
-          </div>
-          <div class="row2">
-            <div class="field"><label for="volInsLimits">Limits (per occurrence / aggregate) *</label><input type="text" id="volInsLimits" placeholder="e.g. $1M / $3M"></div>
-            <div class="field"><label for="volInsExpires">Expiration date *</label><input type="date" id="volInsExpires"></div>
-          </div>
-        </fieldset>
-
-        <div class="consent-box">
-          <div class="consent-row"><input type="checkbox" id="volConsentAge"><label for="volConsentAge">I am 18 or older and licensed to practice as described above.</label></div>
-          <div class="consent-row"><input type="checkbox" id="volConsentInsurance"><label for="volConsentInsurance">I understand that Counselors for Change connects presenters with organizations but does not employ, supervise or insure them. I present under my own professional liability insurance.</label></div>
-          <div class="consent-row"><input type="checkbox" id="volCommit"><label for="volCommit">I'm willing to give at least one presentation a year if called. <span class="hint">(Encouraged, not required.)</span></label></div>
-          <div class="consent-row"><input type="checkbox" id="volConsentPrivacy"><label for="volConsentPrivacy">I've read the <a href="#privacy" data-tab="privacy">Privacy &amp; Terms</a> and understand which fields are public and which stay private.</label></div>
-        </div>
-        <div class="error-text" id="volError" role="alert"></div>
-        <button type="submit" class="btn btn-primary btn-block">Submit my profile for review</button>
-      </form>
-    </div>
-    <aside class="side-note">
-      <h4>Before you sign up</h4>
-      <ul>
-        <li>Your name, credentials, expertise and bio are public once approved.</li>
-        <li>Your license number and insurance are used for verification only. We check your license automatically and recheck it monthly.</li>
-        <li>After you submit, you'll get an email to set up your login so you can edit your profile at any time.</li>
-        <li>You share general availability windows. Once you connect with an organization, you settle the exact date together.</li>
-        <li>What you get: visibility in your community, a ready-made slide template and resource bank, and a way to give back.</li>
-      </ul>
-    </aside>
-  </div>
-</section>
-
-<!-- DIRECTORY -->
+<!-- ============================== DIRECTORY ============================== -->
 <section id="directory" class="view">
   <div class="container page-head">
     <div class="eyebrow">Verified licensed professionals</div>
-    <h2>Find your match</h2>
-    <p>Search or filter by topic and audience to find a counselor for your panel, workshop or psychoeducation session.</p>
+    <h2>Find a presenter</h2>
+    <p>Search or filter by topic and audience. Every profile here has had its license and insurance checked by Counselors for Change.</p>
     <div class="dir-tools">
-      <label class="sr-only" for="dirSearch">Search</label>
+      <label class="sr-only" for="dirSearch">Search presenters</label>
       <input type="search" id="dirSearch" placeholder="Search name, topic, city…">
-      <label class="sr-only" for="dirFormat">Delivery</label>
-      <select id="dirFormat"><option value="">Any delivery</option><option>Virtual</option><option>In-person</option></select>
+      <label class="sr-only" for="dirDelivery">Delivery</label>
+      <select id="dirDelivery"><option value="">Virtual or in-person</option><option>Virtual</option><option>In-person</option></select>
       <button type="button" class="btn btn-outline btn-sm" id="dirClear">Clear filters</button>
     </div>
     <div class="filters"><span class="filter-label">Expertise</span><div class="chipset" id="filterExpertise" data-options="EXPERTISE"></div></div>
-    <div class="filters"><span class="filter-label">Audience</span><div class="chipset" id="filterAudience" data-options="AUDIENCES"></div></div>
+    <div class="filters"><span class="filter-label">Audience</span><div class="chipset" id="filterAudiences" data-options="AUDIENCES"></div></div>
     <div class="result-count" id="resultCount" aria-live="polite"></div>
   </div>
   <div class="container grid-directory" id="directoryGrid"></div>
 </section>
 
-<!-- REQUEST -->
-<section id="request" class="view">
+<!-- ============================== PRESENTERS ============================== -->
+<section id="presenters" class="view">
   <div class="container page-head">
-    <div class="eyebrow">Schools &amp; organizations</div>
-    <h2>Request a speaker</h2>
-    <p>Tell us about your event. If you picked someone from the directory, the request goes straight to them. Otherwise our team matches you with the best fit.</p>
+    <div class="eyebrow">For licensed professionals</div>
+    <h2 id="proHeading">Join as a presenter</h2>
+    <p id="proIntro">Create your account and profile in about five minutes. After C4C verifies your license and insurance, your profile appears in the public directory so schools and organizations can request you.</p>
   </div>
   <div class="container form-wrap">
-    <div class="card">
-      <div class="notice" id="reqNotice" role="status"></div>
-      <div class="targeted" id="targeted">
-        <div class="label" style="font-weight:600;font-size:.86rem">Requesting</div>
-        <div id="targetedName" style="font-weight:700;color:var(--deep-teal)"></div>
-        <div id="targetedAvail" class="hint"></div>
-        <button type="button" class="clear" id="targetedClear">Remove, let C4C match me instead</button>
-      </div>
-      <form id="reqForm" novalidate>
+    <div>
+      <div class="notice" id="proBlocked" hidden></div>
+      <div class="status-banner" id="proStatus" hidden></div>
+      <form id="proForm" class="card" novalidate>
+        <fieldset class="subsection" id="proAccountBlock">
+          <legend>Your account</legend>
+          <div class="row2">
+            <div class="field"><label for="proEmail">Email * <span class="field-flag priv">Private</span></label><input type="email" id="proEmail" autocomplete="email"><div class="hint">This is how you'll sign in.</div></div>
+            <div class="field pw-field"><label for="proPassword">Create a password *</label><input type="password" id="proPassword" autocomplete="new-password"><div class="hint">At least 8 characters.</div></div>
+          </div>
+        </fieldset>
+
         <div class="row2">
-          <div class="field"><label for="reqOrgName">Organization / school name *</label><input type="text" id="reqOrgName" autocomplete="organization" required></div>
-          <div class="field"><label for="reqOrgType">Organization type</label><select id="reqOrgType"></select></div>
+          <div class="field"><label for="proName">Name and credentials * <span class="field-flag pub">Public</span></label><input type="text" id="proName" autocomplete="name" placeholder="e.g. Jordan Rivera, LMHC"></div>
+          <div class="field"><label for="proCity">City &amp; state <span class="field-flag pub">Public</span></label><input type="text" id="proCity" placeholder="e.g. Melbourne, FL"></div>
         </div>
         <div class="row2">
-          <div class="field"><label for="reqContact">Contact name *</label><input type="text" id="reqContact" autocomplete="name" required></div>
-          <div class="field"><label for="reqEmail">Contact email *</label><input type="email" id="reqEmail" autocomplete="email" required></div>
+          <div class="field"><label for="proLicenseType">License type * <span class="field-flag pub">Public</span></label><select id="proLicenseType"></select></div>
+          <div class="field"><label for="proLicenseState">Licensed in state * <span class="field-flag pub">Public</span></label><input type="text" id="proLicenseState" maxlength="2" placeholder="FL"></div>
         </div>
         <div class="row2">
-          <div class="field"><label for="reqCc">CC emails</label><input type="text" id="reqCc" placeholder="principal@school.org, counselor@school.org"><div class="hint">Optional. These people are copied on every update about this request.</div></div>
-          <div class="field"><label for="reqPrior">Have you worked with or talked to anyone at C4C before?</label><select id="reqPrior"><option value="">Select one</option><option value="yes">Yes</option><option value="no">No, this is our first time</option></select></div>
+          <div class="field"><label for="proLicenseNum">License number * <span class="field-flag priv">Private</span></label><input type="text" id="proLicenseNum"><div class="hint">Used only to verify your license.</div></div>
+          <div class="field"><label for="proYears">Years practicing <span class="field-flag priv">Private</span></label><input type="number" id="proYears" min="0" max="80"></div>
         </div>
+        <div class="field"><label for="proPhone">Phone <span class="field-flag priv">Private</span></label><input type="tel" id="proPhone" autocomplete="tel"></div>
+
+        <div class="field"><span class="label">Areas of expertise * <span class="field-flag pub">Public</span></span><div class="chipset" id="proExpertise" data-options="EXPERTISE"></div></div>
+        <div class="field"><span class="label">Audiences you're comfortable with * <span class="field-flag pub">Public</span></span><div class="chipset" id="proAudiences" data-options="AUDIENCES"></div></div>
+        <div class="field"><span class="label">Session types you offer <span class="field-flag pub">Public</span></span><div class="chipset" id="proEventTypes" data-options="EVENT_TYPES"></div></div>
+        <div class="field"><span class="label">Delivery <span class="field-flag pub">Public</span></span><div class="chipset" id="proDelivery" data-options="DELIVERY"></div></div>
+        <div class="field"><span class="label">General availability <span class="field-flag pub">Public</span></span><div class="chipset" id="proAvailability" data-options="AVAILABILITY"></div><div class="hint">Rough windows only. You'll settle exact dates with each organization.</div></div>
         <div class="row2">
-          <div class="field"><label for="reqEventType">Event type *</label><select id="reqEventType" required></select></div>
-          <div class="field"><label for="reqDuration">Session length</label>
-            <select id="reqDuration"><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></div>
+          <div class="field"><label for="proTimezone">Your timezone <span class="field-flag priv">Private</span></label><select id="proTimezone" class="tz-select"></select></div>
+          <div class="field"><label for="proNotice">Minimum days' notice <span class="field-flag priv">Private</span></label><input type="number" id="proNotice" min="1" max="365" value="30"></div>
         </div>
-        <div class="row2">
-          <div class="field"><label for="reqFormat">Delivery</label><select id="reqFormat"><option>Virtual</option><option>In-person</option></select></div>
-          <div class="field"><label for="reqTimezone">Timezone</label><select id="reqTimezone" class="tz-select"></select></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label for="reqAttendees">Expected attendees</label><input type="number" id="reqAttendees" min="1"></div>
-          <div class="field"><label for="reqLocation">Location or meeting link</label><input type="text" id="reqLocation" placeholder="Address, or 'Zoom link to follow'"></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label for="reqWindowStart">Preferred window: earliest date *</label><input type="date" id="reqWindowStart"></div>
-          <div class="field"><label for="reqWindowEnd">Latest date *</label><input type="date" id="reqWindowEnd"></div>
-        </div>
-        <p class="hint" style="margin:-8px 0 16px">Most presenters need about 30 days' notice. You'll settle the exact date with your presenter once you're connected.</p>
-        <details class="field slot-details">
-          <summary>Already have specific times in mind? (optional)</summary>
-          <div class="slot-row"><input type="date" data-slot-date="1" aria-label="Option 1 date"><input type="time" data-slot-time="1" aria-label="Option 1 time"><span class="slot-num">Option 1</span></div>
-          <div class="slot-row"><input type="date" data-slot-date="2" aria-label="Option 2 date"><input type="time" data-slot-time="2" aria-label="Option 2 time"><span class="slot-num">Option 2</span></div>
-          <div class="slot-row"><input type="date" data-slot-date="3" aria-label="Option 3 date"><input type="time" data-slot-time="3" aria-label="Option 3 time"><span class="slot-num">Option 3</span></div>
-        </details>
-        <div class="field"><span class="label">Audience *</span><div class="chipset" id="reqAudience" data-options="AUDIENCES"></div></div>
-        <div class="field"><label for="reqAges">Age or grade range</label><input type="text" id="reqAges" placeholder="e.g. Grades 6–8, or adults"></div>
-        <div class="field"><span class="label">Topics of interest</span><div class="chipset" id="reqTopics" data-options="EXPERTISE"></div></div>
-        <div class="field"><label for="reqDesc">Tell us about the session *</label><textarea id="reqDesc" required placeholder="Goals, context, anything the speaker should know. Please don't include students' personal information."></textarea></div>
-        <div class="field">
-          <span class="label">Support level <span class="hint">This records your intended contribution. No payment is taken here.</span></span>
-          <div class="radio-cards" id="donationCards"></div>
-          <div class="field" style="margin-top:12px"><label for="reqCustomAmount">Or enter a custom amount ($)</label><input type="number" id="reqCustomAmount" min="0" placeholder="Optional"></div>
+        <div class="field"><label for="proBio">Short bio * <span class="field-flag pub">Public</span></label><textarea id="proBio" maxlength="800" placeholder="A few sentences organizations will see on your public profile."></textarea></div>
+        <div class="field"><label for="proWebsite">Practice website or Psychology Today profile <span class="field-flag pub">Public</span></label><input type="url" id="proWebsite" placeholder="https://"></div>
+
+        <fieldset class="subsection">
+          <legend>Professional liability insurance <span class="field-flag priv">Private</span></legend>
+          <p class="hint">Required. C4C's insurance does not cover presenters, so you present under your own policy. Only C4C sees these details; they are shared with a host organization only if it asks.</p>
+          <div class="row2">
+            <div class="field"><label for="proInsCarrier">Carrier *</label><input type="text" id="proInsCarrier"></div>
+            <div class="field"><label for="proInsPolicy">Policy number *</label><input type="text" id="proInsPolicy"></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label for="proInsLimits">Limits (per occurrence / aggregate) *</label><input type="text" id="proInsLimits" placeholder="e.g. $1M / $3M"></div>
+            <div class="field"><label for="proInsExpires">Expiration date *</label><input type="date" id="proInsExpires"></div>
+          </div>
+        </fieldset>
+
+        <div class="consent-box" id="proConsents">
+          <div class="consent-row"><input type="checkbox" id="proConsentLicensed"><label for="proConsentLicensed">I am 18 or older and licensed to practice as described above.</label></div>
+          <div class="consent-row"><input type="checkbox" id="proConsentIndependent"><label for="proConsentIndependent">I understand that Counselors for Change connects presenters with organizations but does not employ, supervise or insure them. I present under my own professional liability insurance.</label></div>
+          <div class="consent-row"><input type="checkbox" id="proConsentPrivacy"><label for="proConsentPrivacy">I've read the <a href="#privacy">Privacy &amp; Terms</a> and understand which details are public and which stay private.</label></div>
         </div>
         <div class="consent-box">
-          <div class="consent-row"><input type="checkbox" id="reqConsentAge"><label for="reqConsentAge">I am 18 or older and authorized to submit this request for my organization.</label></div>
-          <div class="consent-row"><input type="checkbox" id="reqConsentPrivacy"><label for="reqConsentPrivacy">I've read the <a href="#privacy" data-tab="privacy">Privacy &amp; Terms</a> and understand my contact and event details are shared with the matched counselor and not made public.</label></div>
+          <div class="consent-row"><input type="checkbox" id="proCommit"><label for="proCommit">I'm willing to give at least one presentation a year if called. <span class="hint">(Encouraged, not required.)</span></label></div>
         </div>
-        <div class="error-text" id="reqError" role="alert"></div>
-        <button type="submit" class="btn btn-gold btn-block">Submit request</button>
+        <div class="error-text" id="proError" role="alert"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="proSubmit">Create my account and submit for review</button>
+        <p class="hint center" id="proHaveAccount">Already have an account? <a href="#account">Sign in</a></p>
       </form>
     </div>
     <aside class="side-note">
-      <h4>What happens next</h4>
+      <h4>What you get</h4>
       <ul>
-        <li>You'll get a tracking number so you can check your request's status at any time.</li>
-        <li>If you chose a presenter, they're invited to accept. If not, C4C suggests the best-fit verified professionals.</li>
-        <li>Once connected, you and your presenter settle the exact date directly, and both sides get calendar links.</li>
-        <li>New to C4C? We'll offer a quick 30-minute intro call.</li>
+        <li><strong>Visibility.</strong> A verified public profile that schools and organizations in your community can find.</li>
+        <li><strong>Less prep.</strong> A C4C slide template and a shared bank of resources (coming soon).</li>
+        <li><strong>Your schedule.</strong> You share rough availability and only say yes to what fits.</li>
+        <li><strong>Privacy.</strong> License and insurance details are seen only by C4C. We check your license when you join and recheck it regularly.</li>
+      </ul>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================== ORGANIZATIONS ============================== -->
+<section id="organizations" class="view">
+  <div class="container page-head">
+    <div class="eyebrow">For schools &amp; organizations</div>
+    <h2 id="orgHeading">Bring a presenter to your community</h2>
+    <p id="orgIntro">Create a free account for your school or organization with one lead contact. Then request a presenter and follow the request from your dashboard.</p>
+  </div>
+  <div class="container form-wrap">
+    <div>
+      <div class="notice" id="orgBlocked" hidden></div>
+      <form id="orgForm" class="card" novalidate>
+        <div class="row2">
+          <div class="field"><label for="orgName">School or organization name *</label><input type="text" id="orgName" autocomplete="organization"></div>
+          <div class="field"><label for="orgType">Type</label><select id="orgType"></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="orgLeadName">Lead contact name *</label><input type="text" id="orgLeadName" autocomplete="name"></div>
+          <div class="field"><label for="orgEmail">Lead contact email *</label><input type="email" id="orgEmail" autocomplete="email"><div class="hint" id="orgEmailHint">This is how you'll sign in.</div></div>
+        </div>
+        <div class="field pw-field" id="orgPasswordField"><label for="orgPassword">Create a password *</label><input type="password" id="orgPassword" autocomplete="new-password"><div class="hint">At least 8 characters.</div></div>
+        <div class="field"><label for="orgCc">Others to keep in the loop</label><input type="text" id="orgCc" placeholder="principal@school.org, counselor@school.org"><div class="hint">Optional. These addresses are copied on every update. They don't need an account.</div></div>
+        <div class="field"><label for="orgPrior">Have you worked with or talked to anyone at Counselors for Change before?</label>
+          <select id="orgPrior"><option value="">Select one</option><option value="yes">Yes</option><option value="no">No, this is our first time</option></select>
+          <div class="hint">If this is your first time, we'll offer a quick 30-minute intro call.</div></div>
+        <div class="consent-box" id="orgConsents">
+          <div class="consent-row"><input type="checkbox" id="orgConsent"><label for="orgConsent">I am 18 or older, authorized to act for this organization, and I've read the <a href="#privacy">Privacy &amp; Terms</a>.</label></div>
+        </div>
+        <div class="error-text" id="orgError" role="alert"></div>
+        <button type="submit" class="btn btn-gold btn-block" id="orgSubmit">Create organization account</button>
+        <p class="hint center" id="orgHaveAccount">Already have an account? <a href="#account">Sign in</a></p>
+      </form>
+    </div>
+    <aside class="side-note">
+      <h4>How requests work</h4>
+      <ul>
+        <li>Pick a presenter from the directory, or describe what you need and C4C suggests the best fits.</li>
+        <li>Give a date <em>window</em>, not an exact date. Most presenters need about 30 days' notice.</li>
+        <li>Once a presenter says yes, you're introduced and settle the date together.</li>
+        <li>C4C verifies each presenter's license and insurance. Your organization stays responsible for its own vetting.</li>
       </ul>
       <div class="card track-card">
         <h4>Track a request</h4>
         <form id="trackForm">
-          <div class="field"><label for="trackId">Tracking number</label><input type="text" id="trackId" placeholder="C4C-XXXXXX"></div>
-          <div class="field"><label for="trackEmail">Contact email</label><input type="email" id="trackEmail"></div>
+          <div class="field"><label for="trackId">Tracking number</label><input type="text" id="trackId" placeholder="C4C-XXXXXX" autocomplete="off"></div>
+          <div class="field"><label for="trackEmail">Lead or CC email</label><input type="email" id="trackEmail"></div>
           <button type="submit" class="btn btn-outline btn-sm btn-block">Check status</button>
         </form>
         <div id="trackResult" class="track-result" aria-live="polite"></div>
@@ -290,117 +263,239 @@
   </div>
 </section>
 
-<!-- PRIVACY -->
+<!-- ============================== REQUEST ============================== -->
+<section id="request" class="view">
+  <div class="container page-head">
+    <div class="eyebrow">For schools &amp; organizations</div>
+    <h2>Request a presenter</h2>
+    <p>Tell us about your session. You'll get a tracking number and can follow the request from your account.</p>
+  </div>
+  <div class="container form-wrap">
+    <div>
+      <div class="card gate" id="reqGate" hidden></div>
+      <form id="reqForm" class="card" novalidate hidden>
+        <div class="targeted" id="targeted" hidden>
+          <div class="label">Requesting</div>
+          <div id="targetedName" class="targeted-name"></div>
+          <div id="targetedAvail" class="hint"></div>
+          <button type="button" class="link-btn" id="targetedClear">Remove and let C4C suggest presenters instead</button>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="reqEventType">Session type *</label><select id="reqEventType"></select></div>
+          <div class="field"><label for="reqDuration">Length</label>
+            <select id="reqDuration"><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="reqDelivery">Delivery</label><select id="reqDelivery"><option>In-person</option><option>Virtual</option></select></div>
+          <div class="field"><label for="reqTimezone">Timezone</label><select id="reqTimezone" class="tz-select"></select></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="reqWindowStart">Preferred window: earliest date *</label><input type="date" id="reqWindowStart"></div>
+          <div class="field"><label for="reqWindowEnd">Latest date *</label><input type="date" id="reqWindowEnd"></div>
+        </div>
+        <p class="hint under-row">Most presenters need about 30 days' notice. You'll settle the exact date and time with your presenter.</p>
+        <div class="row2">
+          <div class="field"><label for="reqAttendees">Expected attendees</label><input type="number" id="reqAttendees" min="1"></div>
+          <div class="field"><label for="reqAges">Age or grade range</label><input type="text" id="reqAges" placeholder="e.g. Grades 6–8, or adults"></div>
+        </div>
+        <div class="field"><label for="reqLocation">Location</label><input type="text" id="reqLocation" placeholder="Address or room, or 'video link to follow'"></div>
+        <div class="field"><span class="label">Audience *</span><div class="chipset" id="reqAudiences" data-options="AUDIENCES"></div></div>
+        <div class="field"><span class="label">Topics of interest</span><div class="chipset" id="reqTopics" data-options="EXPERTISE"></div></div>
+        <div class="field"><label for="reqDesc">About the session *</label><textarea id="reqDesc" placeholder="Goals, context, anything the presenter should know. Please don't include students' personal information."></textarea></div>
+        <div class="field">
+          <span class="label">Support level <span class="hint">Optional. This records what you intend to contribute; no payment is taken here.</span></span>
+          <div class="radio-cards" id="supportCards"></div>
+          <div class="field tight"><label for="reqCustomAmount">Or a custom amount ($)</label><input type="number" id="reqCustomAmount" min="0" placeholder="Optional"></div>
+        </div>
+        <div class="error-text" id="reqError" role="alert"></div>
+        <button type="submit" class="btn btn-gold btn-block">Submit request</button>
+      </form>
+    </div>
+    <aside class="side-note">
+      <h4>What happens next</h4>
+      <ul>
+        <li>You get a tracking number right away, and an email copy goes to your lead and CC contacts.</li>
+        <li>If you chose a presenter, they're invited to accept. If not, C4C invites the best-fit presenters and you choose among those who are interested.</li>
+        <li>Once connected, you and your presenter settle the date and both get calendar links.</li>
+      </ul>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================== ACCOUNT ============================== -->
+<section id="account" class="view">
+  <div class="container narrow" id="accountSignedOut" hidden>
+    <div class="page-head flush">
+      <div class="eyebrow">Your account</div>
+      <h2>Sign in</h2>
+    </div>
+    <form id="signInForm" class="card" novalidate>
+      <div class="field"><label for="siEmail">Email</label><input type="email" id="siEmail" autocomplete="username"></div>
+      <div class="field pw-field"><label for="siPassword">Password</label><input type="password" id="siPassword" autocomplete="current-password"></div>
+      <div class="error-text" id="siError" role="alert"></div>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+      <p class="hint center pw-field"><button type="button" class="link-btn" id="forgotBtn">Forgot your password?</button></p>
+    </form>
+    <div class="card demo-accounts" id="demoAccounts" hidden></div>
+    <p class="center new-here">New here? <a href="#presenters">Join as a presenter</a> or <a href="#organizations">create an organization account</a>.</p>
+  </div>
+
+  <div class="container narrow" id="accountRecovery" hidden>
+    <div class="page-head flush"><div class="eyebrow">Your account</div><h2>Choose a new password</h2></div>
+    <form id="recoveryForm" class="card" novalidate>
+      <div class="field"><label for="newPassword">New password</label><input type="password" id="newPassword" autocomplete="new-password"><div class="hint">At least 8 characters.</div></div>
+      <div class="error-text" id="recoveryError" role="alert"></div>
+      <button type="submit" class="btn btn-primary btn-block">Save password</button>
+    </form>
+  </div>
+
+  <div class="container" id="accountSignedIn" hidden>
+    <div class="account-head">
+      <div>
+        <div class="eyebrow">Your account</div>
+        <h2 id="accountHello">Welcome</h2>
+        <p class="hint" id="accountEmail"></p>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" id="signOutBtn">Sign out</button>
+    </div>
+    <div id="accountBody"></div>
+  </div>
+</section>
+
+<!-- ============================== ADMIN ============================== -->
+<section id="admin" class="view">
+  <div class="container">
+    <div class="narrow" id="adminGate" hidden></div>
+    <div id="adminPanel" hidden>
+      <div class="page-head flush">
+        <div class="eyebrow">C4C admin</div>
+        <h2>Dashboard</h2>
+        <p>Review presenter profiles, follow every request, and see each email the portal sends.</p>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="admin-tabs" role="tablist" aria-label="Admin sections">
+        <button type="button" role="tab" aria-selected="true" data-admin-tab="presenters">Presenters</button>
+        <button type="button" role="tab" aria-selected="false" data-admin-tab="requests">Requests</button>
+        <button type="button" role="tab" aria-selected="false" data-admin-tab="organizations">Organizations</button>
+        <button type="button" role="tab" aria-selected="false" data-admin-tab="emails">Emails</button>
+        <button type="button" role="tab" aria-selected="false" data-admin-tab="data" id="adminDataTab" hidden>Demo data</button>
+      </div>
+
+      <div data-admin-panel="presenters">
+        <div class="admin-toolbar">
+          <h3>Presenters</h3>
+          <div class="toolbar-actions">
+            <label class="sr-only" for="adminProFilter">Filter by status</label>
+            <select id="adminProFilter" class="status-select"><option value="">All statuses</option><option value="pending">In review</option><option value="approved">Live</option><option value="rejected">Not approved</option><option value="suspended">Paused</option></select>
+            <button type="button" class="btn btn-outline btn-sm" id="exportProsBtn">Export CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Presenter</th><th>Contact</th><th>License &amp; insurance</th><th>Expertise</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead><tbody id="adminProBody"></tbody></table></div>
+      </div>
+
+      <div data-admin-panel="requests" hidden>
+        <div class="admin-toolbar">
+          <h3>Requests</h3>
+          <div class="toolbar-actions">
+            <label class="sr-only" for="adminReqFilter">Filter by status</label>
+            <select id="adminReqFilter" class="status-select"><option value="">All statuses</option><option value="open">Open</option></select>
+            <button type="button" class="btn btn-outline btn-sm" id="exportReqsBtn">Export CSV</button>
+          </div>
+        </div>
+        <div id="adminReqList" class="request-list"></div>
+      </div>
+
+      <div data-admin-panel="organizations" hidden>
+        <div class="admin-toolbar"><h3>Organizations</h3><button type="button" class="btn btn-outline btn-sm" id="exportOrgsBtn">Export CSV</button></div>
+        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Organization</th><th>Lead contact</th><th>Also copied</th><th>Joined</th><th>Notes</th></tr></thead><tbody id="adminOrgBody"></tbody></table></div>
+      </div>
+
+      <div data-admin-panel="emails" hidden>
+        <div class="admin-toolbar"><h3>Emails</h3><span class="hint" id="emailNote"></span></div>
+        <div class="table-wrap"><table class="admin-table"><thead><tr><th>When</th><th>Message</th><th>To</th><th>About</th><th>Status</th></tr></thead><tbody id="adminEmailBody"></tbody></table></div>
+      </div>
+
+      <div data-admin-panel="data" hidden>
+        <div class="card">
+          <h3 class="card-title">Demo data tools</h3>
+          <p class="hint">Demo data lives in <span id="storageMode"></span>. These tools help when showing the portal to the board.</p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-outline btn-sm" id="adminSeedBtn">Load sample data</button>
+            <button type="button" class="btn btn-outline btn-sm" id="exportJsonBtn">Download JSON backup</button>
+            <button type="button" class="btn btn-outline btn-sm danger" id="resetBtn">Clear all demo data</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== PRIVACY ============================== -->
 <section id="privacy" class="view">
   <div class="container privacy-wrap">
     <div class="eyebrow">Legal</div>
     <h2>Privacy &amp; Terms</h2>
-    <p style="font-size:.82rem">Draft. Replace with counsel-reviewed language before launch.</p>
+    <p class="small">Draft. Replace with attorney-reviewed language before launch.</p>
     <div class="callout warn"><p><strong>Before launch:</strong> this is a plain-language starting point, not legal advice. Have it reviewed by an attorney familiar with nonprofit, data privacy and charitable solicitation law in the states where C4C operates.</p></div>
+
+    <h3>What Connections 4 Change is</h3>
+    <p>Connections 4 Change is run by Counselors for Change, Inc. (C4C). It introduces licensed mental health professionals ("presenters") to schools and organizations that want an educational session. C4C verifies each presenter's license and insurance details and then lets the two sides connect directly.</p>
+
+    <h3>C4C connects; it does not employ or insure presenters</h3>
+    <p>Presenters are independent professionals. They are not employees or agents of C4C, and they present under their own professional liability insurance. C4C's insurance does not cover them. Sessions are educational and are not therapy or clinical services.</p>
+
+    <h3>No independent background checks</h3>
+    <p>C4C checks license and insurance information but does not run background checks. Organizations remain responsible for their own vetting, especially for events involving minors.</p>
+
     <h3>What we collect</h3>
-    <p><strong>From licensed professionals:</strong> name, email, phone (optional), city/state, license type, license state, license number, years practicing, expertise, audiences, session formats, delivery, availability windows, timezone, minimum notice, a short bio, an optional website, and professional liability insurance details (carrier, policy number, limits and expiration).</p>
-    <p><strong>From organizations:</strong> organization name and type, contact name and email, event type, length, delivery, timezone, location or meeting link, expected attendees, audience, topics, proposed times, event description and selected support level.</p>
-    <h3>What's public vs. private</h3>
+    <p><strong>From presenters:</strong> name, email, phone (optional), city and state, license type, state and number, years practicing, expertise, audiences, session types, delivery, availability windows, timezone, minimum notice, a short bio, an optional website, and liability insurance details (carrier, policy number, limits, expiration).</p>
+    <p><strong>From organizations:</strong> organization name and type, lead contact name and email, optional CC emails, and for each request the session type, length, delivery, location, expected attendance, audience, age range, topics, date window, description and optional support level.</p>
+
+    <h3>What's public and what's private</h3>
     <table class="privacy-table">
-      <tr><th>Information</th><th>Visibility</th></tr>
-      <tr><td>Counselor name, license type and state, city/state, bio, expertise, audiences, formats, availability windows</td><td>Public, once C4C approves the profile.</td></tr>
-      <tr><td>Counselor email, phone, license number, insurance details, years practicing, timezone, notice preference</td><td>Private. Visible to C4C administrators. Insurance details are shared with a host organization only if it asks.</td></tr>
-      <tr><td>Organization contact and event details, proposed times</td><td>Private. Visible to C4C administrators and to the requested or matched counselor.</td></tr>
-      <tr><td>Support level</td><td>Private. Recording a level does not process a payment.</td></tr>
+      <tr><th>Information</th><th>Who can see it</th></tr>
+      <tr><td>Presenter name, license type and state, city and state, bio, website, expertise, audiences, session types, delivery, availability windows</td><td>Everyone, once C4C approves the profile.</td></tr>
+      <tr><td>Presenter email</td><td>C4C administrators, and an organization once it is connected with that presenter.</td></tr>
+      <tr><td>Presenter phone, license number, insurance details, years practicing, timezone, notice preference</td><td>C4C administrators only. Insurance details are shared with a host organization only if it asks.</td></tr>
+      <tr><td>Organization contact details and request details</td><td>C4C administrators, and the presenters invited to or connected with that request.</td></tr>
+      <tr><td>Support level</td><td>C4C administrators and the organization. Recording a level does not process a payment.</td></tr>
     </table>
+
     <h3>How we use it</h3>
     <ul>
-      <li>To list verified professionals in a searchable directory.</li>
-      <li>To match and route speaker requests, and follow up by email.</li>
-      <li>To verify license information before a profile is approved.</li>
-      <li>To report aggregate, non-identifying statistics.</li>
+      <li>To list verified presenters in a searchable directory.</li>
+      <li>To route requests, introduce both sides, and send updates by email.</li>
+      <li>To verify license and insurance information before and after a profile is approved.</li>
+      <li>To report aggregate, non-identifying statistics about C4C's impact.</li>
       <li>We do not sell personal information or use it for advertising.</li>
     </ul>
-    <h3>C4C connects; it does not employ or insure presenters</h3>
-    <p>Presenters are independent professionals. They are not employees or agents of Counselors for Change, and they present under their own professional liability insurance. C4C's insurance does not cover them.</p>
-    <h3>No independent background checks</h3>
-    <p>C4C reviews self-reported license information but does not run background checks. Organizations remain responsible for their own vetting, especially for events involving minors.</p>
+
+    <h3>Where it is stored</h3>
+    <p>Account and profile data is stored in a hosted database (Supabase) with access rules that enforce the table above. Passwords are never stored in readable form. Emails are sent from C4C's own mail account.</p>
+
     <h3>Eligibility</h3>
-    <p>You must be 18 or older to submit either form. Do not include information about individual students or other minors.</p>
-    <h3>Your rights</h3>
-    <p>You can ask to see, correct or delete your information at any time by emailing <a href="mailto:hello@counselorsforchange.org">hello@counselorsforchange.org</a>.</p>
-    <h3>Donations</h3>
-    <p>Selecting a support level expresses an intended contribution. Before soliciting donations online, confirm C4C's charitable solicitation registration in the relevant states.</p>
-  </div>
-</section>
+    <p>You must be 18 or older to create an account. Do not include information about individual students or other minors in a request.</p>
 
-<!-- CONFIRM (counselor picks a time) -->
-<section id="confirm" class="view"><div class="confirm-wrap" id="confirmContent"></div></section>
+    <h3>Your choices</h3>
+    <p>You can edit your profile or organization details at any time from your account. To see, correct or delete everything we hold about you, email <a href="mailto:info@counselorsforchange.org">info@counselorsforchange.org</a>.</p>
 
-<!-- ADMIN -->
-<section id="admin" class="view">
-  <div class="container">
-    <div id="adminGate" class="gate-wrap">
-      <div class="card">
-        <h3 style="margin-bottom:6px;color:var(--deep-teal)">Board admin</h3>
-        <p class="hint" style="margin-bottom:16px">Enter the admin passcode to review sign-ups and requests.</p>
-        <form id="adminGateForm">
-          <div class="field"><label class="sr-only" for="adminPasscode">Passcode</label><input type="password" id="adminPasscode" placeholder="Passcode" autocomplete="current-password"></div>
-          <button type="submit" class="btn btn-primary btn-block">Unlock</button>
-          <div class="error-text" id="adminGateError">Incorrect passcode.</div>
-        </form>
-      </div>
-    </div>
-    <div id="adminPanel" hidden>
-      <div class="page-head" style="padding-left:0;padding-right:0">
-        <div class="eyebrow">Admin</div>
-        <h2>Portal dashboard</h2>
-        <p>Approve counselor profiles, track speaker requests and export CSVs for board reporting.</p>
-      </div>
-      <div class="kpis" id="kpis"></div>
-      <div class="admin-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected="true" data-admin-tab="counselors">Counselors</button>
-        <button type="button" role="tab" aria-selected="false" data-admin-tab="requests">Requests</button>
-        <button type="button" role="tab" aria-selected="false" data-admin-tab="data">Data</button>
-      </div>
-      <div data-admin-panel="counselors">
-        <div class="admin-toolbar">
-          <h3>Counselors (<span id="adminCounselorCount">0</span>)</h3>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <select id="adminCounselorFilter" class="status-select"><option value="">All statuses</option><option value="pending">Pending review</option><option value="approved">Approved</option><option value="rejected">Not approved</option></select>
-            <button type="button" class="btn btn-outline btn-sm" id="exportCounselorsBtn">Export CSV</button>
-          </div>
-        </div>
-        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Name</th><th>Contact</th><th>License</th><th>Expertise</th><th>Added</th><th>Status</th><th>Actions</th></tr></thead><tbody id="adminCounselorBody"></tbody></table></div>
-      </div>
-      <div data-admin-panel="requests" hidden>
-        <div class="admin-toolbar">
-          <h3>Speaker requests (<span id="adminRequestCount">0</span>)</h3>
-          <button type="button" class="btn btn-outline btn-sm" id="exportRequestsBtn">Export CSV</button>
-        </div>
-        <div class="table-wrap"><table class="admin-table"><thead><tr><th>Organization</th><th>Event</th><th>Times</th><th>Support</th><th>Counselor</th><th>Status</th><th>Actions</th></tr></thead><tbody id="adminRequestBody"></tbody></table></div>
-      </div>
-      <div data-admin-panel="data" hidden>
-        <div class="card" style="margin-bottom:40px">
-          <h3 style="color:var(--deep-teal);margin-bottom:10px">Draft data tools</h3>
-          <p class="hint">Data in this draft lives in this browser only (<span id="storageMode"></span>). These tools help demo the portal to the board.</p>
-          <div class="btn-row">
-            <button type="button" class="btn btn-outline btn-sm" id="adminSeedBtn">Load sample counselors</button>
-            <button type="button" class="btn btn-outline btn-sm" id="exportJsonBtn">Download JSON backup</button>
-            <button type="button" class="btn btn-outline btn-sm" id="resetBtn" style="border-color:var(--alert);color:var(--alert)">Clear all draft data</button>
-          </div>
-        </div>
-      </div>
-      <p style="margin-bottom:40px"><button type="button" class="link-btn" id="lockBtn">Lock admin</button></p>
-    </div>
+    <h3>Support levels and donations</h3>
+    <p>Selecting a support level expresses an intended contribution and is not a payment. Before soliciting donations online, C4C will confirm its charitable solicitation registration in the relevant states.</p>
   </div>
 </section>
 </main>
 
 <footer>
   <div class="container">
-    <div><span class="footer-mark"><svg width="24" height="24"><use href="#four-mark"/></svg></span>© Counselors for Change · Increasing mental health awareness and access</div>
-    <div><a href="#privacy" data-tab="privacy">Privacy &amp; Terms</a> · <a href="https://counselorsforchange.org" target="_blank" rel="noopener">counselorsforchange.org</a></div>
+    <div><span class="footer-mark"><svg width="24" height="24" aria-hidden="true"><use href="#four-mark"/></svg></span>© Counselors for Change, Inc. · Increasing mental health awareness and access</div>
+    <div><a href="#privacy">Privacy &amp; Terms</a> · <a href="https://counselorsforchange.org" target="_blank" rel="noopener">counselorsforchange.org</a></div>
   </div>
 </footer>
+<div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
 <script src="js/config.js"></script>
-<script src="js/storage.js"></script>
+<script src="js/backend-demo.js"></script>
+<script src="js/backend-supabase.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

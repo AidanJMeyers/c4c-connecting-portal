@@ -1,578 +1,920 @@
-/* Counselors for Change — Connecting Portal (draft)
-   Vanilla JS, no build step. Data access goes through window.C4CStore (js/storage.js). */
-(function(){
+/* Connections 4 Change: views and interactions. Vanilla JS, no build step.
+   All data goes through one backend contract: backend-supabase.js when configured,
+   otherwise backend-demo.js. Row shapes match the database (supabase/migrations). */
+(function () {
   "use strict";
-  const CFG = window.C4C_CONFIG, OPT = window.C4C_OPTIONS, Store = window.C4CStore;
-  const $ = (s, el=document) => el.querySelector(s);
-  const $$ = (s, el=document) => Array.from(el.querySelectorAll(s));
-  const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-  const genId = (n=12) => { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, b => b.toString(36).padStart(2,"0")).join("").slice(0, n*2); };
+  const CFG = window.C4C_CONFIG, OPT = window.C4C_OPTIONS;
+  const B = window.C4CSupabaseBackend || window.C4CDemoBackend;
+  const DEMO = B.mode === "demo";
+
+  /* ================= helpers ================= */
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   const isEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
-  const AVATAR_COLORS = ["#2C6489","#3E9A9D","#0E7BAE","#4E6E8A","#23838B","#5E7EA3"];
+  const val = id => $("#" + id).value.trim();
+  const pad = n => String(n).padStart(2, "0");
+  const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const AVATAR_COLORS = ["#2C6489", "#2B7F83", "#0E7BAE", "#4E6E8A", "#23838B", "#5E7EA3"];
 
-  let counselors = [], requests = [];
-  const sel = {};               // chipset id -> Set of selected values
-  let selectedDonation = null, targetedId = null, adminUnlocked = false;
-
-  /* ---------------- Email (optional, EmailJS) ---------------- */
-  let emailReady = null;
-  function loadEmail(){
-    const e = CFG.emailjs;
-    if(!e.enabled || !e.publicKey || !e.serviceId) return Promise.resolve(false);
-    if(emailReady) return emailReady;
-    emailReady = new Promise(res => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/email.min.js";
-      s.onload = () => { try{ emailjs.init({ publicKey: e.publicKey }); res(true); }catch(err){ res(false); } };
-      s.onerror = () => res(false);
-      document.head.appendChild(s);
-    });
-    return emailReady;
+  function toast(msg, kind) {
+    const t = document.createElement("div");
+    t.className = "toast" + (kind === "error" ? " error" : "");
+    t.textContent = msg;
+    $("#toasts").appendChild(t);
+    setTimeout(() => t.remove(), kind === "error" ? 8000 : 5000);
   }
-  async function notify(templateId, params){
-    if(!templateId || !(await loadEmail())) return;
-    try{ await emailjs.send(CFG.emailjs.serviceId, templateId, params); }catch(e){ console.warn("Email failed", e); }
+  // Run an async action with the button disabled; failures surface as a toast.
+  async function run(btn, fn) {
+    if (btn) btn.disabled = true;
+    try { return await fn(); }
+    catch (e) { console.error(e); toast(e.message || "Something went wrong. Please try again.", "error"); }
+    finally { if (btn) btn.disabled = false; }
+  }
+  function showError(id, msg) { const el = $("#" + id); el.textContent = msg || ""; el.classList.toggle("show", !!msg); return !msg; }
+  function download(content, filename, type) {
+    const url = URL.createObjectURL(new Blob([content], { type: type + ";charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
 
-  /* ---------------- Time zone helpers ---------------- */
-  // Offset (ms) of tz from UTC at a given instant.
-  function tzOffset(ms, tz){
-    const p = {}; new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit" })
-      .formatToParts(new Date(ms)).forEach(x => p[x.type] = x.value);
-    return Date.UTC(+p.year, +p.month-1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
+  /* ---- dates and time zones ---- */
+  function tzOffset(ms, tz) {           // offset of tz from UTC at a given instant, in ms
+    const p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
   }
-  // Wall-clock date+time in tz -> UTC Date.
-  function zonedToUtc(date, time, tz){
-    const [y,m,d] = date.split("-").map(Number), [h,mi] = time.split(":").map(Number);
-    const guess = Date.UTC(y, m-1, d, h, mi);
+  function zonedToUtc(date, time, tz) { // wall-clock date + time in tz -> Date
+    const [y, m, d] = date.split("-").map(Number), [h, mi] = time.split(":").map(Number);
+    const guess = Date.UTC(y, m - 1, d, h, mi);
     let t = guess - tzOffset(guess, tz);
     t = guess - tzOffset(t, tz);
     return new Date(t);
   }
-  const tzLabel = tz => (OPT.TIMEZONES.find(t => t[0] === tz) || [tz, tz])[1];
-  function formatSlot(slot, tz){
-    if(!slot?.date || !slot?.time) return "";
-    const [y,m,d] = slot.date.split("-").map(Number), [h,mi] = slot.time.split(":").map(Number);
-    const wall = new Date(Date.UTC(y, m-1, d, h, mi));
-    const s = wall.toLocaleString("en-US", { timeZone:"UTC", weekday:"short", month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" });
-    return `${s} ${tzLabel(tz).replace(/^.*\((.*)\)$/, "$1")}`;
-  }
+  const fmtDay = d => { if (!d) return ""; const [y, m, dd] = d.split("-").map(Number); return new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }); };
+  const fmtWindow = r => `${fmtDay(r.window_start)} to ${fmtDay(r.window_end)}`;
+  const fmtDate = iso => { try { return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }); } catch (e) { return ""; } };
+  const fmtInstant = (iso, tz) => new Date(iso).toLocaleString("en-US", { timeZone: tz || "America/New_York", weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
   const utcStamp = dt => dt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 
-  /* ---------------- Calendar ---------------- */
-  function eventInfo(req){
-    const c = counselors.find(x => x.id === req.counselorId);
-    const slot = req.proposedSlots[req.confirmedSlotIndex];
-    const start = zonedToUtc(slot.date, slot.time, req.timezone);
-    const end = new Date(start.getTime() + (+req.duration || 60) * 60000);
-    const title = `${req.eventType}: ${req.orgName} × ${c ? c.name : "Counselors for Change"}`;
-    const location = req.location || (req.format === "Virtual" ? "Virtual (link to follow)" : "");
-    const details = [`Event: ${req.eventType}`, `Organization: ${req.orgName}`, `Contact: ${req.contact} (${req.email})`,
-      `Audience: ${(req.audiences||[]).join(", ")}`, `Format: ${req.format}`, "", req.description, "", "Booked through Counselors for Change"].join("\n");
-    return { c, start, end, title, location, details };
+  /* ---- calendar ---- */
+  function eventInfo(r) {
+    const start = new Date(r.event.starts_at), end = new Date(start.getTime() + (r.event.duration_min || 60) * 60000);
+    const who = r.matched ? r.matched.display_name : "Counselors for Change";
+    const details = [`${r.event_type} with ${who}`, `Organization: ${r.organization ? r.organization.name : ""}`,
+      `Audience: ${(r.audiences || []).join(", ")}`, "", r.description || "", "", "Arranged through Connections 4 Change (Counselors for Change)"].join("\n");
+    return { start, end, title: `${r.event_type}: ${r.organization ? r.organization.name : ""} × ${who}`, location: r.event.location || "", details };
   }
-  function googleCalUrl(req){
-    const e = eventInfo(req);
-    return "https://calendar.google.com/calendar/render?" + new URLSearchParams({ action:"TEMPLATE", text:e.title, dates:`${utcStamp(e.start)}/${utcStamp(e.end)}`, details:e.details, location:e.location });
+  function googleCalUrl(r) {
+    const e = eventInfo(r);
+    return "https://calendar.google.com/calendar/render?" + new URLSearchParams({ action: "TEMPLATE", text: e.title, dates: `${utcStamp(e.start)}/${utcStamp(e.end)}`, details: e.details, location: e.location });
   }
-  const icsEsc = s => String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n");
-  function downloadIcs(req){
-    const e = eventInfo(req);
-    const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Counselors for Change//Connecting Portal//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","BEGIN:VEVENT",
-      `UID:${req.id}@counselorsforchange.org`, `DTSTAMP:${utcStamp(new Date())}`, `DTSTART:${utcStamp(e.start)}`, `DTEND:${utcStamp(e.end)}`,
-      `SUMMARY:${icsEsc(e.title)}`, `DESCRIPTION:${icsEsc(e.details)}`, `LOCATION:${icsEsc(e.location)}`, "END:VEVENT","END:VCALENDAR"].join("\r\n");
-    download(ics, `c4c-session-${req.id}.ics`, "text/calendar");
-  }
-  function download(content, filename, type){
-    const url = URL.createObjectURL(new Blob([content], { type: type + ";charset=utf-8" }));
-    const a = Object.assign(document.createElement("a"), { href:url, download:filename });
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  const icsEsc = s => String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  function downloadIcs(r) {
+    const e = eventInfo(r);
+    download(["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Counselors for Change//Connections 4 Change//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+      `UID:${r.id}@counselorsforchange.org`, `DTSTAMP:${utcStamp(new Date())}`, `DTSTART:${utcStamp(e.start)}`, `DTEND:${utcStamp(e.end)}`,
+      `SUMMARY:${icsEsc(e.title)}`, `DESCRIPTION:${icsEsc(e.details)}`, `LOCATION:${icsEsc(e.location)}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n"),
+      `c4c-session-${r.tracking_id}.ics`, "text/calendar");
   }
 
-  /* ---------------- UI setup ---------------- */
-  function fillSelect(el, items, placeholder){
+  /* ================= state ================= */
+  const S = { me: null, pro: null, priv: null, org: null, requests: [], directory: [], admin: null,
+    target: null, recovery: false, suggestions: {}, supportTier: null };
+  const sel = {};                        // chipset id -> Set of selected values
+  const isAdmin = () => !!S.me && S.me.role === "admin";
+  const DRAFT_KEY = "c4c2:draft";        // sign-up form held on this device until the email is confirmed
+  const draft = {
+    load() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch (e) { return null; } },
+    save(d) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (e) { /* storage blocked */ } },
+    clear() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* storage blocked */ } }
+  };
+
+  /* ================= one-time UI setup ================= */
+  function fillSelect(el, items, placeholder) {
     el.innerHTML = (placeholder ? `<option value="">${esc(placeholder)}</option>` : "") +
       items.map(it => Array.isArray(it) ? `<option value="${esc(it[0])}">${esc(it[1])}</option>` : `<option>${esc(it)}</option>`).join("");
   }
-  function buildChipset(el){
-    const values = OPT[el.dataset.options];
+  function buildChipset(el) {
     const set = sel[el.id] = new Set();
     el.innerHTML = "";
-    values.forEach(v => {
+    OPT[el.dataset.options].forEach(v => {
       const b = document.createElement("button");
-      b.type = "button"; b.className = "chip-btn"; b.textContent = v; b.setAttribute("aria-pressed", "false");
+      b.type = "button"; b.className = "chip-btn"; b.textContent = v; b.dataset.value = v; b.setAttribute("aria-pressed", "false");
       b.addEventListener("click", () => {
-        set.has(v) ? set.delete(v) : set.add(v);
+        if (set.has(v)) set.delete(v); else set.add(v);
         b.setAttribute("aria-pressed", String(set.has(v)));
-        if(el.id.startsWith("filter")) renderDirectory();
+        if (el.id.startsWith("filter")) renderDirectory();
       });
       el.appendChild(b);
     });
   }
-  function clearChips(id){ sel[id].clear(); $$(`#${id} .chip-btn`).forEach(b => b.setAttribute("aria-pressed","false")); }
+  function setChips(id, values) {
+    sel[id].clear(); (values || []).forEach(v => sel[id].add(v));
+    $$(`#${id} .chip-btn`).forEach(b => b.setAttribute("aria-pressed", String(sel[id].has(b.dataset.value))));
+  }
 
-  function initUI(){
-    fillSelect($("#volLicenseType"), OPT.LICENSE_TYPES, "Select one");
-    fillSelect($("#reqOrgType"), OPT.ORG_TYPES);
+  function initUI() {
+    fillSelect($("#proLicenseType"), OPT.LICENSE_TYPES, "Select one");
+    fillSelect($("#orgType"), OPT.ORG_TYPES);
     fillSelect($("#reqEventType"), OPT.EVENT_TYPES, "Select one");
     $$(".tz-select").forEach(s => fillSelect(s, OPT.TIMEZONES));
     $$(".chipset[data-options]").forEach(buildChipset);
-    const dc = $("#donationCards");
-    dc.innerHTML = OPT.DONATION_TIERS.map(t => `<button type="button" class="radio-card" aria-pressed="false" data-amount="${t[0]}"><div class="amt">${esc(t[1])}</div><div class="lbl">${esc(t[2])}</div></button>`).join("");
-    $$(".radio-card", dc).forEach(card => card.addEventListener("click", () => {
-      $$(".radio-card", dc).forEach(c => c.setAttribute("aria-pressed","false"));
-      card.setAttribute("aria-pressed","true"); selectedDonation = card.dataset.amount; $("#reqCustomAmount").value = "";
+    fillSelect($("#adminReqFilter"), [["", "All statuses"], ["open", "Open"], ...Object.entries(OPT.STATUS).map(([k, v]) => [k, v.label])]);
+
+    const sc = $("#supportCards");
+    sc.innerHTML = OPT.SUPPORT_TIERS.map(t => `<button type="button" class="radio-card" aria-pressed="false" data-tier="${esc(t[0] + " (" + t[1] + ")")}"><div class="amt">${esc(t[0])}</div><div class="lbl">${esc(t[1])}</div></button>`).join("");
+    $$(".radio-card", sc).forEach(card => card.addEventListener("click", () => {
+      const on = card.getAttribute("aria-pressed") !== "true";
+      $$(".radio-card", sc).forEach(c => c.setAttribute("aria-pressed", "false"));
+      card.setAttribute("aria-pressed", String(on));
+      S.supportTier = on ? card.dataset.tier : null;
+      if (on) $("#reqCustomAmount").value = "";
     }));
-    $("#reqCustomAmount").addEventListener("input", e => { if(e.target.value){ $$(".radio-card", dc).forEach(c => c.setAttribute("aria-pressed","false")); selectedDonation = null; } });
-    const today = new Date().toISOString().slice(0,10);
-    $$("[data-slot-date]").forEach(i => i.min = today);
-
-    document.addEventListener("click", e => {
-      const t = e.target.closest("[data-tab]");
-      if(t){ e.preventDefault(); go(t.dataset.tab); }
+    $("#reqCustomAmount").addEventListener("input", e => {
+      if (e.target.value) { $$(".radio-card", sc).forEach(c => c.setAttribute("aria-pressed", "false")); S.supportTier = null; }
     });
-    window.addEventListener("hashchange", route);
+    ["reqWindowStart", "reqWindowEnd", "proInsExpires"].forEach(id => { $("#" + id).min = todayStr(); });
 
+    if (DEMO) {
+      $("#demoBanner").hidden = false;
+      $$(".pw-field").forEach(el => { el.hidden = true; });
+      $("#adminDataTab").hidden = false;
+      $("#storageMode").textContent = B.storage;
+    }
     $("#dirSearch").addEventListener("input", renderDirectory);
-    $("#dirFormat").addEventListener("change", renderDirectory);
-    $("#dirClear").addEventListener("click", () => { $("#dirSearch").value = ""; $("#dirFormat").value = ""; clearChips("filterExpertise"); clearChips("filterAudience"); renderDirectory(); });
-    $("#targetedClear").addEventListener("click", () => setTarget(null));
-
-    if(CFG.draftMode){ $("#demoBanner").hidden = false; $("#seedBtn").addEventListener("click", seed); }
-    $("#storageMode").textContent = Store.mode;
+    $("#dirDelivery").addEventListener("change", renderDirectory);
+    $("#dirClear").addEventListener("click", () => { $("#dirSearch").value = ""; $("#dirDelivery").value = ""; setChips("filterExpertise", []); setChips("filterAudiences", []); renderDirectory(); });
+    $("#targetedClear").addEventListener("click", () => { S.target = null; renderRequestView(); });
+    $("#adminProFilter").addEventListener("change", renderAdmin);
+    $("#adminReqFilter").addEventListener("change", renderAdmin);
+    $$("[data-admin-tab]").forEach(b => b.addEventListener("click", () => {
+      $$("[data-admin-tab]").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+      $$("[data-admin-panel]").forEach(p => { p.hidden = p.dataset.adminPanel !== b.dataset.adminTab; });
+    }));
+    window.addEventListener("hashchange", route);
   }
 
-  /* ---------------- Routing ---------------- */
-  const VIEWS = ["home","join","directory","request","privacy","admin","confirm"];
-  function go(tab){ if(location.hash === "#" + tab) route(); else location.hash = tab; }
-  function route(){
-    const h = location.hash.slice(1);
-    const m = h.match(/^confirm=([a-z0-9]+)$/i);
-    let view = VIEWS.includes(h) ? h : "home";
-    if(m){ view = "confirm"; renderConfirm(m[1]); }
+  /* ================= routing ================= */
+  const VIEWS = ["home", "directory", "presenters", "organizations", "request", "account", "admin", "privacy"];
+  const currentView = () => { const h = location.hash.slice(1); return VIEWS.includes(h) ? h : "home"; };
+  function go(view) { if (location.hash === "#" + view) route(); else location.hash = view; }
+  function route() {
+    const view = currentView();
     $$("section.view").forEach(s => s.classList.toggle("active", s.id === view));
-    $$(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === view));
-    if(view === "admin") showAdmin();
+    $$(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.view.split(" ").includes(view)));
+    if (view === "presenters") fillProForm();
+    if (view === "organizations") fillOrgForm();
+    render(view);
     window.scrollTo({ top: 0 });
   }
-
-  /* ---------------- Data ---------------- */
-  async function load(){
-    counselors = await Store.list("counselors");
-    requests = await Store.list("requests");
+  function render(view) {
+    ({ home: renderHome, directory: renderDirectory, presenters: renderPresenterView, organizations: renderOrgView,
+      request: renderRequestView, account: renderAccount, admin: renderAdmin, privacy: () => {} })[view]();
   }
-  const isPublic = c => !CFG.requireApproval || c.status === "approved";
-  function updateStats(){
-    const pub = counselors.filter(isPublic);
-    $("#statCounselors").textContent = pub.length;
-    $("#statRequests").textContent = requests.length;
-    $("#statExpertise").textContent = new Set(pub.flatMap(c => c.expertise || [])).size;
+
+  /* ================= data ================= */
+  async function refresh() {
+    S.me = B.user();
+    const guard = p => p.catch(e => { console.error(e); toast(e.message || "Could not load data.", "error"); });
+    const jobs = [guard(B.directory().then(d => { S.directory = d || []; }))];
+    if (S.me) {
+      jobs.push(guard(B.myProfessional().then(x => { S.pro = x ? x.pro : null; S.priv = x ? x.priv : null; })));
+      jobs.push(guard(B.myOrganization().then(o => { S.org = o || null; })));
+      jobs.push(guard(B.myRequests().then(r => { S.requests = r || []; })));
+      if (isAdmin()) jobs.push(guard(B.admin.overview().then(a => { S.admin = a; })));
+      else S.admin = null;
+    } else { S.pro = S.priv = S.org = S.admin = null; S.requests = []; }
+    await Promise.all(jobs);
+    $("#navAccount").textContent = S.me ? "My account" : "Sign in";
+    $("#navAdmin").hidden = !(DEMO || isAdmin());
+    render(currentView());
   }
-  function refreshAll(){ updateStats(); renderDirectory(); refreshBadge(); if(adminUnlocked) renderAdmin(); }
 
-  /* ---------------- Join form ---------------- */
-  function showError(el, msg){ el.textContent = msg; el.classList.toggle("show", !!msg); }
-  $("#volForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const v = id => $("#" + id).value.trim();
-    const err = $("#volError");
-    const missing = [];
-    if(!v("volName")) missing.push("name");
-    if(!isEmail(v("volEmail"))) missing.push("a valid email");
-    if(!v("volLicenseType")) missing.push("license type");
-    if(!/^[A-Za-z]{2}$/.test(v("volLicenseState"))) missing.push("2-letter license state");
-    if(!v("volLicenseNum")) missing.push("license number");
-    if(!sel.volExpertise.size) missing.push("at least one area of expertise");
-    if(!sel.volAudience.size) missing.push("at least one audience");
-    if(!v("volBio")) missing.push("a short bio");
-    if(!v("volInsCarrier")) missing.push("insurance carrier");
-    if(!v("volInsPolicy")) missing.push("insurance policy number");
-    if(!v("volInsLimits")) missing.push("insurance limits");
-    if(!v("volInsExpires")) missing.push("insurance expiration date");
-    if(missing.length) return showError(err, "Please add: " + missing.join(", ") + ".");
-    if(v("volInsExpires") < new Date().toISOString().slice(0,10)) return showError(err, "Your liability insurance appears to be expired. Please enter a current policy.");
-    if(!$("#volConsentAge").checked || !$("#volConsentInsurance").checked || !$("#volConsentPrivacy").checked) return showError(err, "Please confirm the age, insurance and privacy checkboxes before submitting.");
-    if(counselors.some(c => c.email.toLowerCase() === v("volEmail").toLowerCase())) return showError(err, "A profile with this email already exists. Contact " + CFG.contactEmail + " to update it.");
-    showError(err, "");
+  // After an email link confirms a new account, finish the sign-up that was started on this device.
+  async function submitDraftIfAny() {
+    const d = draft.load();
+    if (!d || !S.me || d.email !== String(S.me.email).toLowerCase()) return;
+    try {
+      if (d.kind === "pro" && !S.pro) { await B.saveProfessional(d.pro, d.priv); toast("Email confirmed. Your profile was submitted for review."); }
+      if (d.kind === "org" && !S.org) { await B.saveOrganization(d.org); toast("Email confirmed. Your organization account is ready."); }
+      draft.clear();
+      await refresh();
+      go("account");
+    } catch (e) { console.error(e); toast(e.message, "error"); }
+  }
 
-    const btn = e.target.querySelector("[type=submit]"); btn.disabled = true;
-    const entry = {
-      id: genId(), name: v("volName"), email: v("volEmail"), phone: v("volPhone"), location: v("volLocation"),
-      licenseType: v("volLicenseType"), licenseState: v("volLicenseState").toUpperCase(), licenseNum: v("volLicenseNum"),
-      years: v("volYears"), expertise: [...sel.volExpertise], audiences: [...sel.volAudience], eventTypes: [...sel.volEventTypes],
-      formats: [...sel.volFormat], availability: [...sel.volAvailability], timezone: v("volTimezone"), leadTime: v("volLeadTime"),
-      bio: v("volBio"), website: v("volWebsite"),
-      insurance: { carrier: v("volInsCarrier"), policy: v("volInsPolicy"), limits: v("volInsLimits"), expires: v("volInsExpires") },
-      commitAnnual: $("#volCommit").checked,
-      status: CFG.requireApproval ? "pending" : "approved", dateAdded: new Date().toISOString()
-    };
-    try{
-      counselors = await Store.upsert("counselors", entry);
-      notify(CFG.emailjs.templateNewSignup, { to_email: CFG.emailjs.adminEmail, counselor_name: entry.name, counselor_email: entry.email,
-        license_type: entry.licenseType, expertise: entry.expertise.join(", "), audiences: entry.audiences.join(", ") });
-      const n = $("#volNotice"); n.classList.add("show");
-      n.textContent = CFG.requireApproval
-        ? "Thanks! Your profile was submitted. C4C will verify your license and insurance, then email you when it's live in the directory. (In the live version you'll also get a link to set up your login.)"
-        : "You're in the directory! Organizations can now find and request you.";
-      e.target.reset(); ["volExpertise","volAudience","volEventTypes","volFormat","volAvailability"].forEach(clearChips);
-      refreshAll(); n.scrollIntoView({ behavior:"smooth", block:"center" });
-    }catch(x){ showError(err, "Something went wrong saving your profile. Please try again."); }
-    btn.disabled = false;
-  });
+  /* ================= home ================= */
+  function renderHome() {
+    $("#statPresenters").textContent = S.directory.length;
+    $("#statExpertise").textContent = new Set(S.directory.flatMap(p => p.expertise || [])).size;
+    $("#statAudiences").textContent = new Set(S.directory.flatMap(p => p.audiences || [])).size;
+  }
 
-  /* ---------------- Directory ---------------- */
-  function renderDirectory(){
+  /* ================= directory ================= */
+  const shortLicense = t => String(t || "").split(" — ")[0];
+  function renderDirectory() {
     const grid = $("#directoryGrid");
-    const q = $("#dirSearch").value.trim().toLowerCase();
-    const fmt = $("#dirFormat").value;
-    const fx = sel.filterExpertise, fa = sel.filterAudience;
-    const pub = counselors.filter(isPublic);
-    const list = pub.slice().reverse().filter(c =>
-      (!fx.size || (c.expertise||[]).some(x => fx.has(x))) &&
-      (!fa.size || (c.audiences||[]).some(x => fa.has(x))) &&
-      (!fmt || !(c.formats||[]).length || c.formats.includes(fmt)) &&
-      (!q || [c.name, c.bio, c.location, c.licenseType, ...(c.expertise||[]), ...(c.audiences||[])].join(" ").toLowerCase().includes(q)));
-    $("#resultCount").textContent = pub.length ? `Showing ${list.length} of ${pub.length} counselor${pub.length === 1 ? "" : "s"}` : "";
-    if(!list.length){
-      grid.innerHTML = `<div class="empty-state"><svg aria-hidden="true"><use href="#four-mark"/></svg><h3>No matches yet</h3><p>${pub.length ? "Try clearing a filter to see more listings." : "No counselors are listed yet. Be the first to join!"}</p></div>`;
+    const q = $("#dirSearch").value.trim().toLowerCase(), delivery = $("#dirDelivery").value;
+    const fx = sel.filterExpertise, fa = sel.filterAudiences;
+    const list = S.directory.filter(p =>
+      (!fx.size || (p.expertise || []).some(x => fx.has(x))) &&
+      (!fa.size || (p.audiences || []).some(x => fa.has(x))) &&
+      (!delivery || !(p.delivery || []).length || p.delivery.includes(delivery)) &&
+      (!q || [p.display_name, p.bio, p.city_state, p.license_type, ...(p.expertise || []), ...(p.audiences || [])].join(" ").toLowerCase().includes(q)));
+    $("#resultCount").textContent = S.directory.length ? `Showing ${list.length} of ${S.directory.length} presenter${S.directory.length === 1 ? "" : "s"}` : "";
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty-state"><svg aria-hidden="true"><use href="#four-mark"/></svg><h3>${S.directory.length ? "No matches" : "The directory is just getting started"}</h3>
+        <p>${S.directory.length ? "Try clearing a filter to see more presenters." : "No presenters are listed yet. Licensed professionals can join in about five minutes."}</p>
+        ${S.directory.length ? "" : '<a class="btn btn-primary" href="#presenters">Join as a presenter</a>'}</div>`;
       return;
     }
-    grid.innerHTML = list.map((c, i) => {
-      const initials = c.name.split(/\s+/).map(p => p[0]).slice(0,2).join("").toUpperCase();
-      const fmts = (c.formats||[]).length ? `<div class="meta-line"><strong>Delivery:</strong> ${c.formats.map(esc).join(" · ")}</div>` : "";
-      const avail = (c.availability||[]).length ? `<div class="meta-line"><strong>Available:</strong> ${c.availability.map(esc).join(" · ")}</div>` : "";
-      const more = (c.expertise||[]).length > 4 ? `<span class="tag">+${c.expertise.length - 4} more</span>` : "";
+    grid.innerHTML = list.map((p, i) => {
+      const initials = p.display_name.split(",")[0].split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+      const more = (p.expertise || []).length > 4 ? `<span class="tag">+${p.expertise.length - 4} more</span>` : "";
+      const site = p.website && /^https?:\/\//i.test(p.website) ? `<div class="meta-line"><a href="${esc(p.website)}" target="_blank" rel="noopener noreferrer">Website</a></div>` : "";
       return `<article class="profile-card">
         <div class="avatar" style="background:${AVATAR_COLORS[i % AVATAR_COLORS.length]}" aria-hidden="true">${esc(initials)}</div>
-        <h3>${esc(c.name)}</h3>
-        <div class="cred">${esc((c.licenseType||"").split(" — ")[0])} · ${esc(c.licenseState||"")}${c.location ? " · " + esc(c.location) : ""}${c.status === "approved" ? '<span class="verified">✓ Verified</span>' : ""}</div>
-        <div class="bio">${esc(c.bio)}</div>
-        <div class="tag-row">${(c.expertise||[]).slice(0,4).map(t => `<span class="tag">${esc(t)}</span>`).join("")}${more}</div>
-        ${fmts}${avail}
-        <button type="button" class="btn btn-outline btn-block" data-request-id="${esc(c.id)}">Request this speaker</button>
+        <h3>${esc(p.display_name)}</h3>
+        <div class="cred">${esc(shortLicense(p.license_type))} · ${esc(p.license_state)}${p.city_state ? " · " + esc(p.city_state) : ""}<span class="verified">✓ Verified</span></div>
+        <div class="bio">${esc(p.bio)}</div>
+        <div class="tag-row">${(p.expertise || []).slice(0, 4).map(t => `<span class="tag">${esc(t)}</span>`).join("")}${more}</div>
+        ${(p.audiences || []).length ? `<div class="meta-line"><strong>Audiences:</strong> ${p.audiences.map(esc).join(" · ")}</div>` : ""}
+        ${(p.delivery || []).length ? `<div class="meta-line"><strong>Delivery:</strong> ${p.delivery.map(esc).join(" · ")}</div>` : ""}
+        ${(p.availability || []).length ? `<div class="meta-line"><strong>Usually available:</strong> ${p.availability.map(esc).join(" · ")}</div>` : ""}
+        ${site}
+        <button type="button" class="btn btn-outline btn-block" data-act="request-presenter" data-id="${esc(p.id)}">Request this presenter</button>
       </article>`;
     }).join("");
-    $$("[data-request-id]", grid).forEach(b => b.addEventListener("click", () => { setTarget(b.dataset.requestId); go("request"); }));
-  }
-  function setTarget(id){
-    targetedId = id;
-    const c = counselors.find(x => x.id === id), box = $("#targeted");
-    box.classList.toggle("show", !!c);
-    if(!c) return;
-    $("#targetedName").textContent = `${c.name} (${c.licenseType.split(" — ")[0]})`;
-    $("#targetedAvail").textContent = (c.availability||[]).length ? `Their availability: ${c.availability.join(" · ")}. Please propose times inside these windows.` : "";
   }
 
-  /* ---------------- Request form ---------------- */
+  /* ================= presenter sign-up and profile ================= */
+  // signup: signed out · complete: signed in, no profile yet · edit: has a profile · blocked: organization account
+  const proMode = () => !S.me ? "signup" : S.pro ? "edit" : (S.me.role === "organization" ? "blocked" : "complete");
+  function fillProForm() {
+    const p = S.pro, v = S.priv || {};
+    if (!p) { if (S.me && !$("#proName").value) $("#proName").value = S.me.full_name || ""; return; }
+    const set = (id, x) => { $("#" + id).value = x ?? ""; };
+    set("proName", p.display_name); set("proCity", p.city_state); set("proLicenseType", p.license_type); set("proLicenseState", p.license_state);
+    set("proLicenseNum", v.license_number); set("proYears", v.years_practicing); set("proPhone", v.phone);
+    set("proTimezone", v.timezone || "America/New_York"); set("proNotice", v.min_notice_days || 30); set("proBio", p.bio); set("proWebsite", p.website);
+    set("proInsCarrier", v.ins_carrier); set("proInsPolicy", v.ins_policy_number); set("proInsLimits", v.ins_limits); set("proInsExpires", v.ins_expires);
+    $("#proCommit").checked = !!v.commit_annual;
+    setChips("proExpertise", p.expertise); setChips("proAudiences", p.audiences); setChips("proEventTypes", p.event_types);
+    setChips("proDelivery", p.delivery); setChips("proAvailability", p.availability);
+  }
+  function proStatusBanner(target) {
+    const st = OPT.PRO_STATUS[S.pro.status], kind = { pending: "wait", approved: "good", rejected: "bad", suspended: "bad" }[S.pro.status];
+    target.className = "status-banner " + kind; target.hidden = false;
+    target.innerHTML = `<span class="pill ${kind}">${esc(st.label)}</span><span>${esc(st.help)}</span>`;
+  }
+  function renderPresenterView() {
+    const mode = proMode();
+    $("#proForm").hidden = mode === "blocked";
+    $("#proBlocked").hidden = mode !== "blocked";
+    if (mode === "blocked") $("#proBlocked").innerHTML = `You're signed in with an organization account (${esc(S.me.email)}). To join as a presenter, sign out and create a presenter account with a different email.`;
+    $("#proAccountBlock").hidden = mode !== "signup";
+    $("#proHaveAccount").hidden = mode !== "signup";
+    $("#proConsents").hidden = mode === "edit";
+    $("#proHeading").textContent = mode === "edit" ? "Your presenter profile" : mode === "complete" ? "Finish your presenter profile" : "Join as a presenter";
+    $("#proIntro").textContent = mode === "edit"
+      ? "Keep your details current. If you change your license type, state or number, your profile goes back to C4C for a quick re-check before it shows in the directory again."
+      : "Create your account and profile in about five minutes. After C4C verifies your license and insurance, your profile appears in the public directory so schools and organizations can request you.";
+    $("#proSubmit").textContent = mode === "edit" ? "Save changes" : mode === "complete" ? "Submit my profile for review" : "Create my account and submit for review";
+    $("#proInsExpires").min = mode === "edit" ? "" : todayStr();
+    if (mode === "edit") proStatusBanner($("#proStatus")); else $("#proStatus").hidden = true;
+  }
+
+  $("#proForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const mode = proMode(), missing = [];
+    let website = val("proWebsite");
+    if (website && !/^https?:\/\//i.test(website)) website = "https://" + website;
+    const pro = { display_name: val("proName"), city_state: val("proCity"), license_type: val("proLicenseType"),
+      license_state: val("proLicenseState").toUpperCase(), bio: val("proBio"), website,
+      expertise: [...sel.proExpertise], audiences: [...sel.proAudiences], event_types: [...sel.proEventTypes],
+      delivery: [...sel.proDelivery], availability: [...sel.proAvailability] };
+    const priv = { phone: val("proPhone"), license_number: val("proLicenseNum"),
+      years_practicing: val("proYears") === "" ? null : Math.max(0, parseInt(val("proYears"), 10) || 0),
+      timezone: val("proTimezone"), min_notice_days: Math.min(365, Math.max(1, parseInt(val("proNotice"), 10) || 30)),
+      ins_carrier: val("proInsCarrier"), ins_policy_number: val("proInsPolicy"), ins_limits: val("proInsLimits"),
+      ins_expires: val("proInsExpires"), commit_annual: $("#proCommit").checked };
+    const email = val("proEmail").toLowerCase(), password = $("#proPassword").value;
+
+    if (mode === "signup") {
+      if (!isEmail(email)) missing.push("a valid email");
+      if (!DEMO && password.length < CFG.minPasswordLength) missing.push(`a password of at least ${CFG.minPasswordLength} characters`);
+    }
+    if (!pro.display_name) missing.push("your name and credentials");
+    if (!pro.license_type) missing.push("license type");
+    if (!/^[A-Z]{2}$/.test(pro.license_state)) missing.push("the 2-letter state you're licensed in");
+    if (!priv.license_number) missing.push("license number");
+    if (!pro.expertise.length) missing.push("at least one area of expertise");
+    if (!pro.audiences.length) missing.push("at least one audience");
+    if (!pro.bio) missing.push("a short bio");
+    if (!priv.ins_carrier) missing.push("insurance carrier");
+    if (!priv.ins_policy_number) missing.push("insurance policy number");
+    if (!priv.ins_limits) missing.push("insurance limits");
+    if (!priv.ins_expires) missing.push("insurance expiration date");
+    if (missing.length) return showError("proError", "Please add: " + missing.join(", ") + ".");
+    if (priv.ins_expires < todayStr()) return showError("proError", "The liability insurance you entered has expired. Please enter your current policy.");
+    if (mode !== "edit" && !(["proConsentLicensed", "proConsentIndependent", "proConsentPrivacy"].every(id => $("#" + id).checked))) {
+      return showError("proError", "Please tick the three confirmation boxes before submitting.");
+    }
+    showError("proError", "");
+
+    await run($("#proSubmit"), async () => {
+      if (mode === "signup") {
+        const { needsConfirm } = await B.signUp({ email, password, role: "professional", full_name: pro.display_name });
+        if (needsConfirm) {
+          draft.save({ kind: "pro", email, pro, priv });
+          $("#proForm").hidden = true; $("#proBlocked").hidden = false;
+          $("#proBlocked").innerHTML = `<strong>Check your email.</strong> We sent a confirmation link to ${esc(email)}. Open it on this device and your profile will be submitted for review automatically.`;
+          window.scrollTo({ top: 0 });
+          return;
+        }
+      }
+      await B.saveProfessional(pro, priv);
+      $("#proPassword").value = "";
+      await refresh();
+      if (mode === "edit") { fillProForm(); toast("Profile saved."); window.scrollTo({ top: 0 }); }
+      else { toast("Thanks! Your profile was submitted. C4C will verify your license and insurance."); go("account"); }
+    });
+  });
+
+  /* ================= organization sign-up and details ================= */
+  const orgMode = () => !S.me ? "signup" : S.org ? "edit" : (S.me.role === "professional" ? "blocked" : "complete");
+  function fillOrgForm() {
+    const o = S.org;
+    if (!o) {
+      if (S.me) { if (!$("#orgLeadName").value) $("#orgLeadName").value = S.me.full_name || ""; if (!$("#orgEmail").value) $("#orgEmail").value = S.me.email || ""; }
+      return;
+    }
+    $("#orgName").value = o.name; $("#orgType").value = o.org_type; $("#orgLeadName").value = o.lead_name; $("#orgEmail").value = o.lead_email;
+    $("#orgCc").value = (o.cc_emails || []).join(", ");
+    $("#orgPrior").value = o.prior_contact === true ? "yes" : o.prior_contact === false ? "no" : "";
+  }
+  function renderOrgView() {
+    const mode = orgMode();
+    $("#orgForm").hidden = mode === "blocked";
+    $("#orgBlocked").hidden = mode !== "blocked";
+    if (mode === "blocked") $("#orgBlocked").innerHTML = `You're signed in with a presenter account (${esc(S.me.email)}). To request a presenter for a school or organization, sign out and create an organization account with a different email.`;
+    $("#orgPasswordField").hidden = DEMO || mode !== "signup";
+    $("#orgHaveAccount").hidden = mode !== "signup";
+    $("#orgConsents").hidden = mode === "edit";
+    $("#orgEmailHint").textContent = mode === "signup" ? "This is how you'll sign in." : "Updates about your requests go to this address.";
+    $("#orgHeading").textContent = mode === "edit" ? "Your organization" : mode === "complete" ? "Finish setting up your organization" : "Bring a presenter to your community";
+    $("#orgIntro").textContent = mode === "edit"
+      ? "Keep your contact details current. Everyone listed under \"others to keep in the loop\" is copied on updates about your requests."
+      : "Create a free account for your school or organization with one lead contact. Then request a presenter and follow the request from your dashboard.";
+    $("#orgSubmit").textContent = mode === "edit" ? "Save changes" : mode === "complete" ? "Save organization" : "Create organization account";
+  }
+  $("#orgForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const mode = orgMode(), missing = [];
+    const email = val("orgEmail").toLowerCase(), password = $("#orgPassword").value;
+    const cc = val("orgCc").split(/[,;\s]+/).filter(Boolean).map(x => x.toLowerCase());
+    const prior = val("orgPrior");
+    const org = { name: val("orgName"), org_type: val("orgType"), lead_name: val("orgLeadName"), lead_email: email,
+      cc_emails: cc, prior_contact: prior === "yes" ? true : prior === "no" ? false : null };
+    if (!org.name) missing.push("the school or organization name");
+    if (!org.lead_name) missing.push("the lead contact's name");
+    if (!isEmail(email)) missing.push("a valid lead contact email");
+    if (mode === "signup" && !DEMO && password.length < CFG.minPasswordLength) missing.push(`a password of at least ${CFG.minPasswordLength} characters`);
+    if (missing.length) return showError("orgError", "Please add: " + missing.join(", ") + ".");
+    if (cc.some(x => !isEmail(x))) return showError("orgError", "One of the extra email addresses doesn't look right. Separate addresses with commas.");
+    if (mode !== "edit" && !$("#orgConsent").checked) return showError("orgError", "Please tick the confirmation box before continuing.");
+    showError("orgError", "");
+
+    await run($("#orgSubmit"), async () => {
+      if (mode === "signup") {
+        const { needsConfirm } = await B.signUp({ email, password, role: "organization", full_name: org.lead_name });
+        if (needsConfirm) {
+          draft.save({ kind: "org", email, org });
+          $("#orgForm").hidden = true; $("#orgBlocked").hidden = false;
+          $("#orgBlocked").innerHTML = `<strong>Check your email.</strong> We sent a confirmation link to ${esc(email)}. Open it on this device to finish setting up your organization.`;
+          window.scrollTo({ top: 0 });
+          return;
+        }
+      }
+      await B.saveOrganization(org);
+      $("#orgPassword").value = "";
+      await refresh();
+      if (mode === "edit") { fillOrgForm(); toast("Organization saved."); return; }
+      toast(org.prior_contact === false ? "Welcome! Your account is ready, and C4C will reach out to offer a quick intro call." : "Welcome! Your organization account is ready.");
+      go(S.target ? "request" : "account");
+    });
+  });
+
+  $("#trackForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const out = $("#trackResult");
+    await run(e.target.querySelector("button"), async () => {
+      const t = await B.track(val("trackId"), val("trackEmail"));
+      if (!t) { out.textContent = "We couldn't find a request with that tracking number and email."; return; }
+      const st = OPT.STATUS[t.status];
+      out.innerHTML = `<div><strong>${esc(t.event_type)}</strong> for ${esc(t.org_name)}</div>
+        <div style="margin:6px 0">${statusPill(t.status)}</div><div>${esc(st.help)}</div>
+        <div class="hint">${t.presenter_name ? "Presenter: " + esc(t.presenter_name) + " · " : ""}${t.event_starts_at ? esc(fmtInstant(t.event_starts_at)) : "Window: " + esc(fmtWindow(t))}</div>
+        <ol>${(t.history || []).map(h => `<li>${esc(fmtDate(h.at))}: ${esc(h.what)}</li>`).join("")}</ol>`;
+    });
+  });
+
+  /* ================= request form ================= */
+  function renderRequestView() {
+    const gate = $("#reqGate"), form = $("#reqForm");
+    const showGate = html => { gate.innerHTML = html; gate.hidden = false; form.hidden = true; };
+    if (!S.me) return showGate(`<h3>Start with an organization account</h3><p>It's free and takes a minute. You'll use it to make requests and follow their progress.</p>
+      <div class="btn-row"><a class="btn btn-gold" href="#organizations">Create an account</a><a class="btn btn-outline" href="#account">Sign in</a></div>`);
+    if (!S.org) return showGate(S.me.role === "professional"
+      ? `<h3>Requests come from organization accounts</h3><p>You're signed in as a presenter. To request a presenter for a school or organization, sign out and use an organization account.</p>`
+      : `<h3>One more step</h3><p>Tell us about your school or organization, then you can make a request.</p><div class="btn-row"><a class="btn btn-gold" href="#organizations">Set up my organization</a></div>`);
+    gate.hidden = true; form.hidden = false;
+    const t = S.target && S.directory.find(p => p.id === S.target);
+    $("#targeted").hidden = !t;
+    if (t) {
+      $("#targetedName").textContent = `${t.display_name} (${shortLicense(t.license_type)})`;
+      $("#targetedAvail").textContent = (t.availability || []).length ? `Usually available: ${t.availability.join(" · ")}` : "";
+    }
+  }
   $("#reqForm").addEventListener("submit", async e => {
     e.preventDefault();
-    const v = id => $("#" + id).value.trim();
-    const err = $("#reqError");
-    const missing = [];
-    if(!v("reqOrgName")) missing.push("organization name");
-    if(!v("reqContact")) missing.push("contact name");
-    if(!isEmail(v("reqEmail"))) missing.push("a valid email");
-    if(!v("reqEventType")) missing.push("event type");
-    if(!sel.reqAudience.size) missing.push("audience");
-    if(!v("reqDesc")) missing.push("a session description");
-    const ws = v("reqWindowStart"), we = v("reqWindowEnd"), todayStr = new Date().toISOString().slice(0,10);
-    if(!ws || !we) missing.push("a preferred date window");
-    if(missing.length) return showError(err, "Please add: " + missing.join(", ") + ".");
-    if(ws < todayStr || we < ws) return showError(err, "The preferred window must start today or later, and end on or after its start date.");
-    const rawSlots = [1,2,3].map(i => ({ date: $(`[data-slot-date="${i}"]`).value, time: $(`[data-slot-time="${i}"]`).value }));
-    if(rawSlots.some(s => !!s.date !== !!s.time)) return showError(err, "Each specific time needs both a date and a time.");
-    const slots = rawSlots.filter(s => s.date && s.time);
-    const tz = v("reqTimezone");
-    if(slots.some(s => zonedToUtc(s.date, s.time, tz) < new Date())) return showError(err, "Specific times must be in the future.");
-    const cc = v("reqCc").split(/[,;\s]+/).filter(Boolean);
-    if(cc.some(x => !isEmail(x))) return showError(err, "One of the CC emails doesn't look right. Separate addresses with commas.");
-    if(!$("#reqConsentAge").checked || !$("#reqConsentPrivacy").checked) return showError(err, "Please confirm both checkboxes before submitting.");
-    showError(err, "");
+    const missing = [], ws = val("reqWindowStart"), we = val("reqWindowEnd"), custom = val("reqCustomAmount");
+    const fields = { requested_professional_id: S.target || null, event_type: val("reqEventType"), topics: [...sel.reqTopics],
+      audiences: [...sel.reqAudiences], age_range: val("reqAges") || null,
+      attendees_expected: val("reqAttendees") === "" ? null : Math.max(1, parseInt(val("reqAttendees"), 10) || 1),
+      delivery: val("reqDelivery"), location: val("reqLocation") || null, duration_min: parseInt(val("reqDuration"), 10),
+      timezone: val("reqTimezone"), window_start: ws, window_end: we, description: val("reqDesc"),
+      support_level: custom ? `$${custom} (custom)` : S.supportTier };
+    if (!fields.event_type) missing.push("session type");
+    if (!ws || !we) missing.push("a preferred date window");
+    if (!fields.audiences.length) missing.push("at least one audience");
+    if (!fields.description) missing.push("a few words about the session");
+    if (missing.length) return showError("reqError", "Please add: " + missing.join(", ") + ".");
+    if (ws < todayStr() || we < ws) return showError("reqError", "The window should start today or later, and end on or after its start date.");
+    showError("reqError", "");
+    await run(e.target.querySelector("[type=submit]"), async () => {
+      const r = await B.createRequest(fields);
+      e.target.reset(); setChips("reqAudiences", []); setChips("reqTopics", []);
+      $$("#supportCards .radio-card").forEach(c => c.setAttribute("aria-pressed", "false"));
+      S.supportTier = null; S.target = null;
+      await refresh();
+      toast(`Request received. Your tracking number is ${r.tracking_id}.`);
+      go("account");
+    });
+  });
 
+  /* ================= request cards (account and admin) ================= */
+  const PILL = { new: "neutral", matching: "wait", awaiting_presenter: "wait", connected: "info", confirmed: "good", completed: "good", declined: "bad", cancelled: "bad" };
+  const statusPill = s => `<span class="pill ${PILL[s] || "neutral"}">${esc((OPT.STATUS[s] || { label: s }).label)}</span>`;
+  const fact = (label, value) => (value || value === 0) && value !== "" ? `<div><span>${esc(label)}</span>${value}</div>` : "";
+  const mailto = (email, text) => `<a href="mailto:${esc(email)}">${esc(text || email)}</a>`;
+
+  function scheduleForm(r, isChange) {
+    const tz = r.timezone || "America/New_York", ev = r.event;
+    const inner = `<form data-form="schedule" data-id="${esc(r.id)}">
+        <div class="row3">
+          <div><label>Date<input type="date" name="date" min="${todayStr()}" required></label></div>
+          <div><label>Start time<input type="time" name="time" required></label></div>
+          <div><label>Timezone<select name="tz">${OPT.TIMEZONES.map(t => `<option value="${esc(t[0])}" ${t[0] === tz ? "selected" : ""}>${esc(t[1])}</option>`).join("")}</select></label></div>
+        </div>
+        <div class="row2">
+          <div><label>Length (minutes)<input type="number" name="duration" min="15" max="480" value="${esc((ev && ev.duration_min) || r.duration_min || 60)}"></label></div>
+          <div><label>Location<input type="text" name="location" value="${esc((ev && ev.location) || r.location || "")}"></label></div>
+        </div>
+        <div class="btn-row"><button type="submit" class="btn btn-primary btn-sm">${isChange ? "Save new date" : "Confirm this date"}</button></div>
+      </form>`;
+    return isChange ? `<details class="history"><summary>Change the date</summary>${inner}</details>`
+      : `<div class="req-box action"><h4>Set the date</h4><p>Once you've agreed on a date together, record it here. Both sides get calendar links.</p>${inner}</div>`;
+  }
+
+  function requestCard(r, role) {
+    const st = OPT.STATUS[r.status] || { label: r.status, help: "" };
+    const closed = ["completed", "cancelled", "declined"].includes(r.status);
+    const meId = S.me.id, org = r.organization || {};
+    const isMatched = !!r.matched && r.matched.id === meId, isRequested = !!r.requested && r.requested.id === meId;
+    const myCand = (r.candidates || []).find(c => c.professional_id === meId);
+    const party = role === "org" || role === "admin" || isMatched;
+    const eventPast = r.event && new Date(r.event.starts_at) <= new Date();
+    let boxes = "", help = st.help, actions = "";
+    if (r.status === "confirmed" && eventPast) {
+      help = isMatched || role === "admin" ? "The session date has passed. Please record how it went." : "The session date has passed. Your presenter will record how it went.";
+    }
+
+    /* ---- presenter ---- */
+    if (role === "pro") {
+      if (r.status === "awaiting_presenter" && isRequested) {
+        help = `${org.name} asked for you by name.`;
+        boxes += `<div class="req-box action"><h4>Can you take this one?</h4><p>If you accept, you'll be introduced to ${esc(org.lead_name || "the lead contact")} to settle the exact date.</p>
+          <div class="btn-row"><button type="button" class="btn btn-primary btn-sm" data-act="respond" data-id="${esc(r.id)}" data-accept="1">Accept</button>
+          <button type="button" class="btn btn-outline btn-sm" data-act="respond" data-id="${esc(r.id)}" data-accept="0">I can't take this one</button></div></div>`;
+      } else if (r.status === "matching" && myCand && !myCand.response) {
+        help = "C4C thinks you'd be a good fit for this request.";
+        boxes += `<div class="req-box action"><h4>Are you interested?</h4><p>If you say yes, the organization sees your profile and can choose you. Nothing is booked yet.</p>
+          <div class="btn-row"><button type="button" class="btn btn-primary btn-sm" data-act="respond" data-id="${esc(r.id)}" data-accept="1">I'm interested</button>
+          <button type="button" class="btn btn-outline btn-sm" data-act="respond" data-id="${esc(r.id)}" data-accept="0">Not this time</button></div></div>`;
+      } else if (r.status === "matching" && myCand && myCand.response === "interested") {
+        help = "You said you're interested. The organization will choose a presenter soon.";
+      } else if (myCand && myCand.response === "declined" && !isMatched) {
+        help = "You passed on this one. Thanks for letting us know.";
+      } else if (!isMatched && ["connected", "confirmed", "completed"].includes(r.status)) {
+        help = "Another presenter is handling this request.";
+      } else if (r.status === "matching" && isRequested) {
+        help = "You passed on this one. C4C is finding another presenter.";
+      }
+      if (isMatched && org.lead_email && !closed) {
+        boxes += `<div class="req-box"><h4>Your contact</h4><p><strong>${esc(org.lead_name)}</strong>, ${esc(org.name)} · ${mailto(org.lead_email)}</p></div>`;
+      }
+    }
+
+    /* ---- organization ---- */
+    if (role === "org") {
+      const interested = (r.candidates || []).filter(c => c.response === "interested");
+      if (r.status === "matching") {
+        if (interested.length) {
+          boxes += `<div class="req-box action"><h4>Interested presenters</h4><p>Choose one to be introduced and settle the date.</p>${interested.map(c =>
+            `<div class="cand-row"><span><strong>${esc(c.display_name)}</strong> · <a href="#directory" data-act="view-presenter" data-name="${esc(c.display_name)}">view profile</a></span>
+             <button type="button" class="btn btn-primary btn-sm" data-act="choose" data-id="${esc(r.id)}" data-pro="${esc(c.professional_id)}">Choose</button></div>`).join("")}</div>`;
+        } else help = "C4C has invited best-fit presenters. You'll see them here as they respond.";
+      }
+      if (r.status === "awaiting_presenter" && r.requested) help = `Waiting for ${r.requested.display_name} to reply.`;
+      if (r.matched && !closed) {
+        boxes += `<div class="req-box"><h4>Your presenter</h4><p><strong>${esc(r.matched.display_name)}</strong>${r.matched.email ? " · " + mailto(r.matched.email) : ""}</p></div>`;
+      }
+    }
+
+    /* ---- admin ---- */
+    if (role === "admin") {
+      const cands = r.candidates || [];
+      boxes += `<div class="req-box"><h4>Organization</h4><p><strong>${esc(org.name)}</strong> · ${esc(org.org_type || "")}${org.prior_contact === false ? ' <span class="tagmini">New to C4C</span>' : ""}<br>
+        ${esc(org.lead_name)} · ${mailto(org.lead_email)}${(org.cc_emails || []).length ? "<br>Also copied: " + org.cc_emails.map(esc).join(", ") : ""}</p></div>`;
+      if (r.matched || r.requested || cands.length) {
+        boxes += `<div class="req-box"><h4>Presenters</h4>
+          ${r.matched ? `<p>Matched: <strong>${esc(r.matched.display_name)}</strong>${r.matched.email ? " · " + mailto(r.matched.email) : ""}</p>` : ""}
+          ${r.requested && !r.matched ? `<p>Requested by the organization: <strong>${esc(r.requested.display_name)}</strong></p>` : ""}
+          ${cands.map(c => `<div class="cand-row"><span>${esc(c.display_name)}<span class="score">fit ${esc(c.score)}</span></span>
+             <span>${c.response === "interested" ? '<span class="pill good">Interested</span>' : c.response === "declined" ? '<span class="pill bad">Passed</span>' : '<span class="pill wait">No reply yet</span>'}</span></div>`).join("")}</div>`;
+      }
+      const sug = S.suggestions[r.id], canMatch = !closed && !["connected", "confirmed"].includes(r.status);
+      if (canMatch && sug) {
+        const canInvite = ["new", "matching", "declined"].includes(r.status);
+        boxes += `<div class="req-box action"><h4>Suggested presenters</h4>${!sug.length ? "<p>No approved presenters yet.</p>" : sug.map((s, i) => {
+          const already = cands.some(c => c.professional_id === s.professional_id);
+          return `<div class="suggest-row"><label><input type="checkbox" data-suggest="${esc(r.id)}" value="${esc(s.professional_id)}" ${already || !canInvite ? "disabled" : (i < 5 && s.score > 0 ? "checked" : "")}>
+            ${esc(s.display_name)}<span class="score">fit ${esc(s.score)}</span>${already ? ' <span class="hint">already invited</span>' : ""}</label>
+            <button type="button" class="link-btn" data-act="admin-assign" data-id="${esc(r.id)}" data-pro="${esc(s.professional_id)}" data-name="${esc(s.display_name)}">Assign directly</button></div>`;
+        }).join("") + (canInvite
+          ? `<div class="btn-row"><button type="button" class="btn btn-primary btn-sm" data-act="admin-invite" data-id="${esc(r.id)}">Invite selected</button></div><p class="hint">Invited presenters are emailed and can say they're interested. The organization then chooses.</p>`
+          : `<p class="hint">Invitations open once the requested presenter has replied. You can still assign someone directly.</p>`)}</div>`;
+      }
+      actions += `<label class="sr-only" for="st-${esc(r.id)}">Status</label>
+        <select class="status-select" id="st-${esc(r.id)}" data-change="admin-status" data-id="${esc(r.id)}">${Object.entries(OPT.STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${esc(v.label)}</option>`).join("")}</select>
+        ${canMatch && !sug ? `<button type="button" class="link-btn" data-act="admin-suggest" data-id="${esc(r.id)}">Suggest presenters</button>` : ""}
+        <button type="button" class="link-btn danger" data-act="admin-remove-request" data-id="${esc(r.id)}">Remove</button>`;
+    }
+
+    /* ---- shared: date, outcome, cancel ---- */
+    if (r.event) {
+      boxes += `<div class="req-box"><h4>${eventPast ? "Session" : "On the calendar"}</h4>
+        <p><strong>${esc(fmtInstant(r.event.starts_at, r.timezone))}</strong> · ${esc(r.event.duration_min)} minutes${r.event.location ? " · " + esc(r.event.location) : ""}</p>
+        ${r.event.attendance_actual != null ? `<p>Attendance: <strong>${esc(r.event.attendance_actual)}</strong>${r.event.presenter_hours != null ? ` · Presenter time: <strong>${esc(r.event.presenter_hours)} h</strong>` : ""}</p>` : ""}
+        ${!eventPast && party ? `<div class="btn-row"><a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="${esc(googleCalUrl(r))}">Add to Google Calendar</a>
+          <button type="button" class="btn btn-outline btn-sm" data-act="ics" data-id="${esc(r.id)}">Download .ics (Apple / Outlook)</button></div>` : ""}
+        ${!eventPast && party && r.status === "confirmed" ? scheduleForm(r, true) : ""}</div>`;
+    }
+    if (party && r.status === "connected" && r.matched) boxes += scheduleForm(r, false);
+    if (r.status === "confirmed" && eventPast && (isMatched || role === "admin")) {
+      boxes += `<div class="req-box action"><h4>How did it go?</h4><p>Record the turnout so C4C can report its impact.</p>
+        <form data-form="outcome" data-id="${esc(r.event.id)}"><div class="row2">
+          <div><label>People who attended<input type="number" name="attendance" min="0" required></label></div>
+          <div><label>Your time, in hours (including prep)<input type="number" name="hours" min="0" step="0.25" required></label></div>
+        </div><div class="btn-row"><button type="submit" class="btn btn-primary btn-sm">Save and mark complete</button></div></form></div>`;
+    }
+    if (role === "org" && !closed) actions += `<button type="button" class="link-btn danger" data-act="cancel" data-id="${esc(r.id)}">Cancel this request</button>`;
+
+    const title = role === "org" ? r.event_type : `${r.event_type} · ${org.name || ""}`;
+    return `<article class="req-card${closed ? " closed" : ""}">
+      <div class="req-top"><div><h4 class="req-title">${esc(title)}</h4>
+        <div class="req-sub"><code>${esc(r.tracking_id)}</code> · submitted ${esc(fmtDate(r.created_at))}</div></div>${statusPill(r.status)}</div>
+      <p class="req-help">${esc(help)}</p>
+      <div class="req-facts">
+        ${fact("Preferred window", esc(fmtWindow(r)))}${fact("Audience", (r.audiences || []).map(esc).join(", "))}${fact("Ages / grades", esc(r.age_range))}
+        ${fact("Expected attendance", esc(r.attendees_expected))}${fact("Delivery", esc(r.delivery))}${fact("Length", esc(r.duration_min) + " minutes")}
+        ${fact("Location", esc(r.location))}${fact("Topics", (r.topics || []).map(esc).join(", "))}${role !== "pro" ? fact("Support level", esc(r.support_level)) : ""}
+      </div>
+      <p class="req-desc">${esc(r.description)}</p>
+      ${boxes}
+      ${actions ? `<div class="req-actions">${actions}</div>` : ""}
+      ${(r.history || []).length ? `<details class="history"><summary>Timeline (${r.history.length})</summary><ol>${r.history.map(h => `<li>${esc(fmtDate(h.at))}: ${esc(h.what)}</li>`).join("")}</ol></details>` : ""}
+    </article>`;
+  }
+
+  /* ================= account ================= */
+  async function renderAccount() {
+    $("#accountRecovery").hidden = !S.recovery;
+    $("#accountSignedOut").hidden = S.recovery || !!S.me;
+    $("#accountSignedIn").hidden = S.recovery || !S.me;
+    if (S.recovery) return;
+    if (!S.me) {
+      if (DEMO) {
+        const box = $("#demoAccounts"), accounts = await B.demo.accounts();
+        box.hidden = false;
+        box.innerHTML = `<h4>Demo accounts</h4><p class="hint">Demo mode has no passwords. Pick an account to see the portal from that side.</p>` +
+          (accounts.length ? accounts.map(a => `<div class="acct"><span><strong>${esc(a.full_name)}</strong><br><span class="hint">${a.role === "organization" ? "Organization" : "Presenter"} · ${esc(a.email)}</span></span>
+            <button type="button" class="btn btn-outline btn-sm" data-act="demo-signin" data-email="${esc(a.email)}">Sign in</button></div>`).join("")
+            : `<p class="hint">No accounts yet. <button type="button" class="link-btn" data-act="seed">Load sample data</button> to get a few to try.</p>`);
+      }
+      return;
+    }
+    $("#accountHello").textContent = "Welcome, " + (S.me.full_name || "").split(",")[0].split(" ")[0];
+    $("#accountEmail").textContent = `Signed in as ${S.me.email}${DEMO ? " (demo)" : ""}`;
+    let html = "";
+
+    if (isAdmin()) {
+      html += `<section class="dash-section"><div class="card"><div class="dash-head"><h3>C4C admin</h3><a class="btn btn-primary btn-sm" href="#admin">Open the dashboard</a></div>
+        <p class="hint">Review presenters, follow requests and see every email the portal sends.</p></div></section>`;
+    }
+
+    if (S.pro) {
+      const st = OPT.PRO_STATUS[S.pro.status], kind = { pending: "wait", approved: "good", rejected: "bad", suspended: "bad" }[S.pro.status];
+      const exp = S.priv && S.priv.ins_expires, soon = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+      const insNote = !exp ? "" : exp < todayStr()
+        ? `<div class="status-banner bad"><span class="pill bad">Insurance expired</span><span>The liability insurance on file expired on ${esc(fmtDay(exp))}. Please update it to keep presenting.</span></div>`
+        : exp <= soon ? `<div class="status-banner wait"><span class="pill wait">Renewing soon</span><span>Your liability insurance on file expires on ${esc(fmtDay(exp))}. Update it once you've renewed.</span></div>` : "";
+      const mine = S.requests.filter(r => (r.matched && r.matched.id === S.me.id) || (r.requested && r.requested.id === S.me.id) || (r.candidates || []).some(c => c.professional_id === S.me.id));
+      html += `<section class="dash-section">
+        <div class="dash-head"><h3>Your presenter profile</h3><a class="btn btn-outline btn-sm" href="#presenters">Edit profile</a></div>
+        <div class="status-banner ${kind}"><span class="pill ${kind}">${esc(st.label)}</span><span>${esc(st.help)}</span></div>${insNote}
+        <div class="dash-head" style="margin-top:28px"><h3>Invitations and sessions</h3></div>
+        ${mine.length ? `<div class="request-list">${mine.map(r => requestCard(r, "pro")).join("")}</div>`
+          : `<div class="empty-box">Nothing here yet. When an organization requests you, or C4C thinks you're a good fit for a request, it will show up here and you'll get an email.</div>`}
+      </section>`;
+    } else if (S.me.role === "professional") {
+      html += `<section class="dash-section"><div class="card gate"><h3>Finish your presenter profile</h3><p>Your account is ready. Add your license, expertise and insurance details so C4C can review and list you.</p>
+        <div class="btn-row"><a class="btn btn-primary" href="#presenters">Complete my profile</a></div></div></section>`;
+    }
+
+    if (S.org) {
+      const mine = S.requests.filter(r => r.organization && r.organization.id === S.org.id);
+      html += `<section class="dash-section">
+        <div class="dash-head"><h3>${esc(S.org.name)}</h3><div class="toolbar-actions"><a class="btn btn-gold btn-sm" href="#request">New request</a><a class="btn btn-outline btn-sm" href="#organizations">Edit details</a></div></div>
+        <div class="card"><div class="dash-summary">
+          <div><span>Type</span>${esc(S.org.org_type)}</div><div><span>Lead contact</span>${esc(S.org.lead_name)} · ${esc(S.org.lead_email)}</div>
+          <div><span>Also kept in the loop</span>${(S.org.cc_emails || []).length ? S.org.cc_emails.map(esc).join(", ") : "No one yet"}</div></div></div>
+        <div class="dash-head" style="margin-top:28px"><h3>Your requests</h3></div>
+        ${mine.length ? `<div class="request-list">${mine.map(r => requestCard(r, "org")).join("")}</div>`
+          : `<div class="empty-box">No requests yet. <a href="#directory">Browse the directory</a> to request someone by name, or <a href="#request">describe what you need</a> and C4C will suggest presenters.</div>`}
+      </section>`;
+    } else if (S.me.role === "organization") {
+      html += `<section class="dash-section"><div class="card gate"><h3>Finish setting up your organization</h3><p>Add your school or organization's details, then you can request a presenter.</p>
+        <div class="btn-row"><a class="btn btn-gold" href="#organizations">Set up my organization</a></div></div></section>`;
+    }
+    $("#accountBody").innerHTML = html;
+  }
+
+  $("#signInForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = val("siEmail").toLowerCase(), password = $("#siPassword").value;
+    if (!isEmail(email)) return showError("siError", "Enter the email you signed up with.");
+    if (!DEMO && !password) return showError("siError", "Enter your password.");
+    showError("siError", "");
     const btn = e.target.querySelector("[type=submit]"); btn.disabled = true;
-    const custom = v("reqCustomAmount");
-    const c = counselors.find(x => x.id === targetedId);
-    const entry = {
-      id: genId(), confirmToken: genId(16), trackingId: newTrackingId(),
-      orgName: v("reqOrgName"), orgType: v("reqOrgType"), contact: v("reqContact"), email: v("reqEmail"),
-      cc, priorContact: v("reqPrior"), ages: v("reqAges"), windowStart: ws, windowEnd: we,
-      eventType: v("reqEventType"), duration: v("reqDuration"), format: v("reqFormat"), timezone: tz, attendees: v("reqAttendees"),
-      location: v("reqLocation"), proposedSlots: slots, confirmedSlotIndex: null, audiences: [...sel.reqAudience], topics: [...sel.reqTopics],
-      description: v("reqDesc"), donation: custom ? `$${custom} (custom)` : (selectedDonation ? "$" + selectedDonation.replace("-", "–$") : "Not specified"),
-      counselorId: c ? c.id : null, counselorName: c ? c.name : null,
-      status: c ? "Awaiting counselor" : "New", history: [{ at: new Date().toISOString(), what: "Submitted" }], dateAdded: new Date().toISOString()
-    };
-    try{
-      requests = await Store.upsert("requests", entry);
-      const params = { org_name: entry.orgName, contact_name: entry.contact, contact_email: entry.email, event_type: entry.eventType,
-        audiences: entry.audiences.join(", "), tracking_id: entry.trackingId, window: fmtWindow(entry),
-        proposed_slots: slots.map((s,i) => `Option ${i+1}: ${formatSlot(s, tz)}`).join(" | "), cc: cc.join(", "),
-        first_time: entry.priorContact === "no" ? "Yes, offer an intro call" : "No",
-        donation: entry.donation, counselor_name: entry.counselorName || "Needs matching", confirm_url: confirmUrl(entry.confirmToken) };
-      notify(CFG.emailjs.templateNewRequest, { ...params, to_email: CFG.emailjs.adminEmail });
-      if(c) notify(CFG.emailjs.templateNewRequest, { ...params, to_email: c.email });
-      const n = $("#reqNotice"); n.classList.add("show");
-      n.textContent = `Request received. Your tracking number is ${entry.trackingId}. ` +
-        (c ? `${c.name} will be invited to accept, and we'll email ${entry.email} when they reply.`
-           : `C4C will suggest best-fit presenters and follow up at ${entry.email}.`) +
-        (entry.priorContact === "no" ? " Since this is your first time with C4C, we'll also reach out to offer a 30-minute intro call." : "");
-      e.target.reset(); clearChips("reqAudience"); clearChips("reqTopics");
-      $$("#donationCards .radio-card").forEach(x => x.setAttribute("aria-pressed","false")); selectedDonation = null; setTarget(null);
-      refreshAll(); n.scrollIntoView({ behavior:"smooth", block:"center" });
-    }catch(x){ showError(err, "Something went wrong submitting your request. Please try again."); }
-    btn.disabled = false;
+    try { await B.signIn({ email, password }); $("#siPassword").value = ""; await refresh(); await submitDraftIfAny(); }
+    catch (err) { showError("siError", err.message); }
+    finally { btn.disabled = false; }
   });
-
-  /* ---------------- Tracking ---------------- */
-  function newTrackingId(){
-    const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", a = new Uint8Array(6); crypto.getRandomValues(a);
-    return "C4C-" + Array.from(a, b => abc[b % abc.length]).join("");
-  }
-  const fmtDay = d => { if(!d) return ""; const [y,m,dd] = d.split("-").map(Number); return new Date(Date.UTC(y, m-1, dd)).toLocaleDateString("en-US", { timeZone:"UTC", month:"short", day:"numeric", year:"numeric" }); };
-  const fmtWindow = r => r.windowStart ? `${fmtDay(r.windowStart)} to ${fmtDay(r.windowEnd)}` : "";
-  $("#trackForm").addEventListener("submit", e => {
-    e.preventDefault();
-    const id = $("#trackId").value.trim().toUpperCase(), em = $("#trackEmail").value.trim().toLowerCase(), out = $("#trackResult");
-    const r = requests.find(x => x.trackingId === id && x.email.toLowerCase() === em);
-    if(!r){ out.textContent = "We couldn't find a request with that tracking number and email."; return; }
-    const when = r.confirmedSlotIndex != null ? formatSlot(r.proposedSlots[r.confirmedSlotIndex], r.timezone) : fmtWindow(r);
-    out.innerHTML = `<div><strong>${esc(r.eventType)}</strong> for ${esc(r.orgName)}</div>
-      <div style="margin:6px 0"><span class="tr-status">${esc(r.status)}</span></div>
-      <div>${esc(OPT.STATUS_HELP[r.status] || "")}</div>
-      <div class="hint">${r.counselorName && !["New","Matching"].includes(r.status) ? "Presenter: " + esc(r.counselorName) + " · " : ""}${esc(when)}</div>
-      <ol>${(r.history||[]).map(h => `<li>${esc(fmtDate(h.at))}: ${esc(h.what)}</li>`).join("")}</ol>`;
-  });
-
-  /* ---------------- Matching suggestions ---------------- */
-  // Rank approved presenters for a request: topic fit counts most, then audience, session type, delivery and notice.
-  function scoreCounselor(c, r){
-    const hit = (a, b) => (a||[]).filter(x => (b||[]).includes(x)).length;
-    let s = hit(r.topics, c.expertise) * 3 + hit(r.audiences, c.audiences) * 2;
-    if((c.eventTypes||[]).includes(r.eventType)) s += 1;
-    if(!(c.formats||[]).length || c.formats.includes(r.format)) s += 1;
-    if(r.windowEnd){
-      const days = (new Date(r.windowEnd) - new Date()) / 86400000;
-      if(days < (+c.leadTime || 30)) s -= 2;
-    }
-    return s;
-  }
-  function rankedCandidates(r){
-    return counselors.filter(c => c.status === "approved").map(c => ({ c, score: scoreCounselor(c, r) })).sort((a, b) => b.score - a.score);
-  }
-
-  /* ---------------- Confirmation flow ---------------- */
-  const confirmUrl = token => location.origin + location.pathname + "#confirm=" + token;
-  function detailBlock(r){
-    const row = (k, val) => val ? `<div class="detail-row"><span>${k}</span><span>${val}</span></div>` : "";
-    return `<div class="card">${row("Organization", esc(r.orgName))}${row("Contact", esc(r.contact) + " · " + esc(r.email))}${row("Event type", esc(r.eventType))}
-      ${row("Length", esc(r.duration) + " minutes")}${row("Delivery", esc(r.format))}${row("Attendees", esc(r.attendees))}
-      ${row("Preferred window", esc(fmtWindow(r)))}${row("Audience", (r.audiences||[]).map(esc).join(", "))}${row("Ages / grades", esc(r.ages))}
-      ${row("Topics", (r.topics||[]).map(esc).join(", "))}${row("Location", esc(r.location))}
-      <div class="detail-row"><span>About</span><span style="font-weight:400;max-width:70%">${esc(r.description)}</span></div></div>`;
-  }
-  async function saveRequest(r, what){ (r.history = r.history || []).push({ at: new Date().toISOString(), what }); requests = await Store.upsert("requests", r); refreshAll(); }
-
-  function renderConfirm(token){
-    const box = $("#confirmContent");
-    const r = requests.find(x => x.confirmToken === token);
-    if(!r){
-      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Confirmation link</div><h2>We couldn't find that request</h2>
-        <p>The link may be mistyped or the request was removed. Questions? Email ${esc(CFG.contactEmail)}.</p></div>
-        <button type="button" class="btn btn-outline" data-tab="home">Back to home</button>`;
-      return;
-    }
-    const c = counselors.find(x => x.id === r.counselorId);
-    if(r.status === "Confirmed" || r.status === "Completed"){
-      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Booking confirmed</div><h2>You're all set</h2>
-        <p>This session is confirmed for <strong>${esc(formatSlot(r.proposedSlots[r.confirmedSlotIndex], r.timezone))}</strong>.</p></div>
-        ${detailBlock(r)}<h3>Add to your calendar</h3>
-        <div class="btn-row"><a class="btn btn-primary" target="_blank" rel="noopener" href="${esc(googleCalUrl(r))}">Google Calendar</a>
-        <button type="button" class="btn btn-outline" id="icsBtn">Download .ics (Apple / Outlook)</button></div>`;
-      $("#icsBtn").addEventListener("click", () => downloadIcs(r));
-      return;
-    }
-    if(["Declined","Cancelled"].includes(r.status)){
-      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Request closed</div><h2>This request was ${esc(r.status.toLowerCase())}</h2><p>No further action is needed.</p></div>`;
-      return;
-    }
-    if(r.status === "Connected"){
-      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">You're connected</div><h2>Thanks for saying yes</h2>
-        <p>Reach out to <strong>${esc(r.contact)}</strong> at <a href="mailto:${esc(r.email)}">${esc(r.email)}</a> to settle the exact date inside their window (${esc(fmtWindow(r))}). C4C has been notified and is here if you need anything.</p></div>${detailBlock(r)}`;
-      return;
-    }
-    const first = (c ? c.name : "there").split(" ")[0];
-    if(!(r.proposedSlots||[]).length){
-      box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Speaker request</div><h2>${esc(r.orgName)} would like you to present</h2>
-        <p>Hi ${esc(first)}, they're hoping for a date between <strong>${esc(fmtWindow(r))}</strong>. If you accept, you'll settle the exact date with them directly.</p></div>
-        ${detailBlock(r)}
-        <div class="btn-row"><button type="button" class="btn btn-primary" id="acceptBtn">I'm interested, connect us</button>
-        <button type="button" class="btn btn-outline" id="declineBtn">I can't take this one</button></div>`;
-      $("#acceptBtn").addEventListener("click", async () => { r.status = "Connected"; await saveRequest(r, "Presenter accepted; connected with organization"); renderConfirm(token); });
-      $("#declineBtn").addEventListener("click", async () => {
-        if(!confirm("Decline this request? C4C will follow up with the organization.")) return;
-        r.status = "Declined"; await saveRequest(r, "Declined by presenter"); renderConfirm(token);
-      });
-      return;
-    }
-    let chosen = null;
-    box.innerHTML = `<div class="confirm-head"><div class="eyebrow">Speaker request</div><h2>${esc(r.orgName)} would like to book you</h2>
-      <p>Hi ${esc(first)}, pick the time that works best, or decline if none do.</p></div>
-      ${detailBlock(r)}<h3>Pick a time</h3>
-      <div id="slotChoices">${r.proposedSlots.map((s,i) => `<button type="button" class="slot-choice" aria-pressed="false" data-i="${i}"><div class="slot-when">${esc(formatSlot(s, r.timezone))}</div><div class="slot-tz">${esc(tzLabel(r.timezone))}</div></button>`).join("")}</div>
-      <div class="btn-row"><button type="button" class="btn btn-primary" id="confirmBtn" disabled>Confirm this time</button>
-      <button type="button" class="btn btn-outline" id="declineBtn">None of these work</button></div>`;
-    $$(".slot-choice", box).forEach(b => b.addEventListener("click", () => {
-      chosen = +b.dataset.i; $$(".slot-choice", box).forEach(x => x.setAttribute("aria-pressed", String(x === b))); $("#confirmBtn").disabled = false;
-    }));
-    $("#confirmBtn").addEventListener("click", async () => {
-      if(chosen === null) return;
-      r.confirmedSlotIndex = chosen; r.status = "Confirmed";
-      await saveRequest(r, "Confirmed by counselor");
-      const when = formatSlot(r.proposedSlots[chosen], r.timezone), cal = googleCalUrl(r);
-      const params = { org_name: r.orgName, contact_name: r.contact, event_type: r.eventType, when, counselor_name: c ? c.name : "", calendar_url: cal };
-      notify(CFG.emailjs.templateConfirmed, { ...params, to_email: r.email });
-      if(c) notify(CFG.emailjs.templateConfirmed, { ...params, to_email: c.email });
-      notify(CFG.emailjs.templateConfirmed, { ...params, to_email: CFG.emailjs.adminEmail });
-      renderConfirm(token);
-    });
-    $("#declineBtn").addEventListener("click", async () => {
-      if(!confirm("Decline all proposed times? C4C will follow up with the organization.")) return;
-      r.status = "Declined"; await saveRequest(r, "Declined by counselor"); renderConfirm(token);
-    });
-  }
-
-  /* ---------------- Admin ---------------- */
-  async function sha256(s){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)); return Array.from(new Uint8Array(b), x => x.toString(16).padStart(2,"0")).join(""); }
-  $("#adminGateForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const ok = (await sha256($("#adminPasscode").value)) === CFG.adminPasscodeHash;
-    $("#adminGateError").classList.toggle("show", !ok);
-    if(ok){ adminUnlocked = true; $("#adminPasscode").value = ""; showAdmin(); }
-  });
-  $("#lockBtn").addEventListener("click", () => { adminUnlocked = false; showAdmin(); });
-  $$("[data-admin-tab]").forEach(b => b.addEventListener("click", () => {
-    $$("[data-admin-tab]").forEach(x => x.setAttribute("aria-selected", String(x === b)));
-    $$("[data-admin-panel]").forEach(p => p.hidden = p.dataset.adminPanel !== b.dataset.adminTab);
+  $("#forgotBtn").addEventListener("click", e => run(e.target, async () => {
+    const email = val("siEmail").toLowerCase();
+    if (!isEmail(email)) return showError("siError", "Enter your email above first, then choose \"Forgot your password?\" again.");
+    showError("siError", "");
+    await B.resetPassword(email);
+    toast("If that email has an account, a link to reset your password is on its way.");
   }));
-  function showAdmin(){
-    $("#adminGate").hidden = adminUnlocked; $("#adminPanel").hidden = !adminUnlocked;
-    if(adminUnlocked){ renderAdmin(); Store.setMeta("adminLastViewed", Date.now()).then(refreshBadge); }
-  }
-  async function refreshBadge(){
-    const last = (await Store.getMeta("adminLastViewed")) || 0;
-    const n = [...counselors, ...requests].filter(x => new Date(x.dateAdded).getTime() > last).length;
-    const b = $("#adminBadge"); b.hidden = !n; b.textContent = n > 99 ? "99+" : n;
-  }
-  const fmtDate = iso => { try{ return new Date(iso).toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" }); }catch(e){ return iso || ""; } };
-  const STATUS_LABEL = { pending: "Pending review", approved: "Approved", rejected: "Not approved" };
+  $("#recoveryForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const pw = $("#newPassword").value;
+    if (pw.length < CFG.minPasswordLength) return showError("recoveryError", `Use at least ${CFG.minPasswordLength} characters.`);
+    showError("recoveryError", "");
+    await run(e.target.querySelector("[type=submit]"), async () => {
+      await B.updatePassword(pw);
+      S.recovery = false; $("#newPassword").value = "";
+      toast("Password updated."); await refresh();
+    });
+  });
+  $("#signOutBtn").addEventListener("click", e => run(e.target, async () => { await B.signOut(); await refresh(); go("home"); }));
 
-  function renderAdmin(){
-    const pending = counselors.filter(c => c.status === "pending").length;
-    const open = requests.filter(r => ["New","Matching","Awaiting counselor"].includes(r.status)).length;
-    const confirmed = requests.filter(r => ["Connected","Confirmed","Completed"].includes(r.status)).length;
-    const todayStr = new Date().toISOString().slice(0,10);
-    $("#kpis").innerHTML = [[counselors.filter(c => c.status === "approved").length, "Approved counselors"], [pending, "Pending review"], [open, "Open requests"], [confirmed, "Connections made"]]
+  /* ================= admin ================= */
+  const EMAIL_LABEL = {
+    application_received: "Application received", admin_new_presenter: "New presenter to review", profile_approved: "Profile approved",
+    admin_reverify_presenter: "Presenter changed license details", admin_new_organization: "New organization", intro_call_offer: "Intro call offer",
+    request_received: "Request received", admin_new_request: "New request", presenter_invited: "Invitation to present",
+    presenter_interested: "A presenter is interested", admin_presenter_interested: "A presenter is interested (C4C copy)",
+    connected_organization: "You're connected (to organization)", connected_presenter: "You're connected (to presenter)", admin_connection: "New connection",
+    event_confirmed: "Date confirmed", admin_event_confirmed: "Date confirmed (C4C copy)", event_rescheduled: "Date changed",
+    admin_event_rescheduled: "Date changed (C4C copy)", admin_needs_matching: "Request needs matching",
+    request_cancelled: "Request cancelled", admin_request_cancelled: "Request cancelled (C4C copy)"
+  };
+  function renderAdmin() {
+    const gate = $("#adminGate"), panel = $("#adminPanel");
+    if (!isAdmin() || !S.admin) {
+      panel.hidden = true; gate.hidden = false;
+      gate.innerHTML = DEMO
+        ? `<div class="page-head flush"><div class="eyebrow">C4C admin</div><h2>Demo admin</h2></div>
+           <form id="demoAdminForm" class="card"><p class="hint" style="margin-bottom:14px">Enter the demo passcode to see the admin dashboard. With the live backend, board members sign in with their own accounts instead.</p>
+           <div class="field"><label for="demoPasscode">Passcode</label><input type="password" id="demoPasscode" autocomplete="off"></div>
+           <div class="error-text" id="demoAdminError" role="alert"></div><button type="submit" class="btn btn-primary btn-block">Open dashboard</button></form>`
+        : `<div class="card gate" style="margin-top:48px"><h3>Admins only</h3><p>${S.me ? "This account doesn't have admin access." : "Sign in with a C4C admin account to open the dashboard."}</p>
+           ${S.me ? "" : '<div class="btn-row"><a class="btn btn-primary" href="#account">Sign in</a></div>'}</div>`;
+      return;
+    }
+    gate.hidden = true; panel.hidden = false;
+    const A = S.admin, pros = A.professionals, reqs = A.requests;
+    const open = reqs.filter(r => ["new", "matching", "awaiting_presenter"].includes(r.status));
+    $("#kpis").innerHTML = [[pros.filter(p => p.status === "approved").length, "Live presenters"], [pros.filter(p => p.status === "pending").length, "Waiting for review"],
+      [open.length, "Open requests"], [reqs.filter(r => ["connected", "confirmed", "completed"].includes(r.status)).length, "Connections made"]]
       .map(k => `<div class="kpi"><b>${k[0]}</b><span>${k[1]}</span></div>`).join("");
 
-    const f = $("#adminCounselorFilter").value;
-    const cl = counselors.filter(c => !f || c.status === f).slice().reverse();
-    $("#adminCounselorCount").textContent = counselors.length;
-    $("#adminCounselorBody").innerHTML = cl.length ? cl.map(c => `<tr>
-      <td><strong>${esc(c.name)}</strong><br><span class="hint">${esc(c.location)}</span></td>
-      <td>${esc(c.email)}${c.phone ? "<br>" + esc(c.phone) : ""}</td>
-      <td>${esc((c.licenseType||"").split(" — ")[0])}<br><span class="hint">${esc(c.licenseState)} · #${esc(c.licenseNum)}${c.years ? " · " + esc(c.years) + " yrs" : ""}</span>
-        <br><span class="hint">${c.insurance ? `Ins: ${esc(c.insurance.carrier)} · ${esc(c.insurance.limits)} · exp ${esc(fmtDay(c.insurance.expires))}${c.insurance.expires < todayStr ? ' <span class="flag-bad">EXPIRED</span>' : ""}` : '<span class="flag-bad">No insurance on file</span>'}</span>
-        ${c.commitAnnual ? '<br><span class="tagmini">1 talk / year</span>' : ""}</td>
-      <td>${(c.expertise||[]).map(x => `<span class="tagmini">${esc(x)}</span>`).join("")}</td>
-      <td>${fmtDate(c.dateAdded)}</td>
-      <td><span class="status-pill ${esc(c.status)}">${STATUS_LABEL[c.status] || esc(c.status)}</span></td>
-      <td>${c.status !== "approved" ? `<button class="link-btn" data-c-approve="${esc(c.id)}">Approve</button>` : ""}${c.status !== "rejected" ? `<button class="link-btn" data-c-reject="${esc(c.id)}">${c.status === "approved" ? "Unlist" : "Reject"}</button>` : ""}<button class="link-btn danger" data-c-remove="${esc(c.id)}">Remove</button></td>
-    </tr>`).join("") : `<tr><td colspan="7" class="admin-empty">No counselors${f ? " with this status" : " yet"}.</td></tr>`;
+    /* presenters */
+    const pf = $("#adminProFilter").value, today = todayStr();
+    const proRows = pros.filter(p => !pf || p.status === pf);
+    $("#adminProBody").innerHTML = proRows.length ? proRows.map(p => {
+      const v = p.private || {}, kind = { pending: "wait", approved: "good", rejected: "bad", suspended: "bad" }[p.status];
+      const ins = v.ins_carrier
+        ? `${esc(v.ins_carrier)} · ${esc(v.ins_limits)} · policy ${esc(v.ins_policy_number)}<br>expires ${esc(fmtDay(v.ins_expires))}${v.ins_expires < today ? ' <span class="flag-bad">EXPIRED</span>' : ""}
+           ${v.ins_verified_at ? ' · <span class="flag-ok">verified</span>' : ' · <span class="flag-bad">not yet verified</span>'}`
+        : '<span class="flag-bad">No insurance on file</span>';
+      const act = (label, a, extra) => `<button type="button" class="link-btn${extra || ""}" data-act="${a}" data-id="${esc(p.id)}" data-name="${esc(p.display_name)}">${label}</button>`;
+      return `<tr>
+        <td><strong>${esc(p.display_name)}</strong><br><span class="hint">${esc(p.city_state || "")}</span>${p.website && /^https?:\/\//i.test(p.website) ? `<br><a class="hint" href="${esc(p.website)}" target="_blank" rel="noopener noreferrer">website</a>` : ""}</td>
+        <td>${mailto(p.email)}${v.phone ? "<br>" + esc(v.phone) : ""}</td>
+        <td>${esc(shortLicense(p.license_type))} · ${esc(p.license_state)} · #${esc(v.license_number || "")}${v.years_practicing != null ? " · " + esc(v.years_practicing) + " yrs" : ""}
+          <br><span class="hint">${ins}</span>${v.commit_annual ? '<br><span class="tagmini">Will present yearly</span>' : ""}</td>
+        <td>${(p.expertise || []).map(x => `<span class="tagmini">${esc(x)}</span>`).join("")}</td>
+        <td>${esc(fmtDate(p.created_at))}</td>
+        <td><span class="pill ${kind}">${esc(OPT.PRO_STATUS[p.status].label)}</span></td>
+        <td>${p.status !== "approved" ? act("Approve", "pro-approve") : ""}${p.status === "pending" ? act("Don't approve", "pro-reject") : ""}${p.status === "approved" ? act("Pause", "pro-suspend") : ""}
+          ${v.ins_carrier ? act(v.ins_verified_at ? "Unmark insurance" : "Mark insurance verified", v.ins_verified_at ? "ins-unverify" : "ins-verify") : ""}${act("Remove", "pro-remove", " danger")}</td></tr>`;
+    }).join("") : `<tr><td colspan="7" class="admin-empty">${pf ? "No presenters with this status." : "No presenters yet."}</td></tr>`;
 
-    $("#adminRequestCount").textContent = requests.length;
-    $("#adminRequestBody").innerHTML = requests.length ? requests.slice().reverse().map(r => { const ranked = rankedCandidates(r); return `<tr>
-      <td><strong>${esc(r.orgName)}</strong><br><span class="hint">${esc(r.trackingId || "")}<br>${esc(r.orgType)}<br>${esc(r.contact)} · ${esc(r.email)}${(r.cc||[]).length ? "<br>CC: " + r.cc.map(esc).join(", ") : ""}</span>${r.priorContact === "no" ? '<br><span class="tagmini">New to C4C: offer intro call</span>' : ""}</td>
-      <td>${esc(r.eventType)}<br><span class="hint">${esc(r.duration)} min · ${esc(r.format)}${r.attendees ? " · " + esc(r.attendees) + " people" : ""}${r.ages ? " · " + esc(r.ages) : ""}</span><br>${(r.audiences||[]).map(x => `<span class="tagmini">${esc(x)}</span>`).join("")}</td>
-      <td>${r.windowStart ? `<div class="hint">Window: ${esc(fmtWindow(r))}</div>` : ""}${(r.proposedSlots||[]).map((s,i) => `<div style="${r.confirmedSlotIndex === i ? "font-weight:700;color:var(--deep-teal)" : ""}">${r.confirmedSlotIndex === i ? "✓ " : ""}${esc(formatSlot(s, r.timezone))}</div>`).join("")}</td>
-      <td>${esc(r.donation)}</td>
-      <td><select class="status-select" data-r-assign="${esc(r.id)}" aria-label="Assign presenter"><option value="">Needs matching</option>${ranked.map((x, i) => `<option value="${esc(x.c.id)}" ${x.c.id === r.counselorId ? "selected" : ""}>${i < 5 && x.score > 0 ? "★ " : ""}${esc(x.c.name)} (fit ${x.score})</option>`).join("")}</select>
-        <div class="hint">★ = top 5 suggested</div></td>
-      <td><select class="status-select" data-r-status="${esc(r.id)}" aria-label="Request status">${OPT.REQUEST_STATUSES.map(s => `<option ${r.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-      <td>${r.counselorId ? `<button class="link-btn" data-r-copy="${esc(r.confirmToken)}">Copy invite link</button><br>` : ""}<button class="link-btn danger" data-r-remove="${esc(r.id)}">Remove</button></td>
-    </tr>`; }).join("") : `<tr><td colspan="7" class="admin-empty">No speaker requests yet.</td></tr>`;
+    /* requests */
+    const rf = $("#adminReqFilter").value;
+    const reqRows = reqs.filter(r => !rf || (rf === "open" ? open.includes(r) : r.status === rf));
+    $("#adminReqList").innerHTML = reqRows.length ? reqRows.map(r => requestCard(r, "admin")).join("") : `<div class="empty-box">${rf ? "No requests match this filter." : "No requests yet."}</div>`;
+
+    /* organizations */
+    $("#adminOrgBody").innerHTML = A.organizations.length ? A.organizations.map(o => `<tr>
+      <td><strong>${esc(o.name)}</strong><br><span class="hint">${esc(o.org_type)}</span></td>
+      <td>${esc(o.lead_name)}<br>${mailto(o.lead_email)}</td>
+      <td>${(o.cc_emails || []).map(esc).join("<br>") || '<span class="hint">None</span>'}</td>
+      <td>${esc(fmtDate(o.created_at))}</td>
+      <td>${o.prior_contact === false ? `<span class="tagmini">New to C4C</span><br><span class="hint">Intro call offered ${esc(fmtDate(o.intro_call_offered_at))}</span><br>` : o.prior_contact === true ? '<span class="hint">Has worked with C4C</span><br>' : ""}
+        <span class="hint">${reqs.filter(r => r.organization && r.organization.id === o.id).length} request(s)</span></td></tr>`).join("")
+      : `<tr><td colspan="5" class="admin-empty">No organizations yet.</td></tr>`;
+
+    /* emails */
+    $("#emailNote").textContent = DEMO ? "Demo mode: these are the emails the live portal would send. Nothing is delivered."
+      : "Messages show as queued until email sending is switched on.";
+    $("#adminEmailBody").innerHTML = A.outbox.length ? A.outbox.map(m => {
+      const p = m.payload || {}, about = p.tracking_id ? `${esc(p.tracking_id)} · ${esc(p.org_name || "")}` : esc(p.presenter_name || p.org_name || "");
+      const status = DEMO ? '<span class="pill neutral">Not sent (demo)</span>' : `<span class="pill ${{ queued: "wait", sent: "good", failed: "bad", skipped: "neutral" }[m.status] || "neutral"}">${esc(m.status)}</span>`;
+      return `<tr><td>${esc(new Date(m.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</td>
+        <td>${esc(EMAIL_LABEL[m.template] || m.template)}</td>
+        <td>${(m.to_emails || []).map(esc).join("<br>")}${(m.cc_emails || []).length ? `<br><span class="hint">cc ${m.cc_emails.map(esc).join(", ")}</span>` : ""}</td>
+        <td>${about}</td><td>${status}</td></tr>`;
+    }).join("") : `<tr><td colspan="5" class="admin-empty">No emails yet.</td></tr>`;
   }
 
-  async function setCounselorStatus(id, status){
-    const c = counselors.find(x => x.id === id); if(!c) return;
-    c.status = status; c.reviewedAt = new Date().toISOString();
-    counselors = await Store.upsert("counselors", c); refreshAll();
-  }
-  $("#adminCounselorFilter").addEventListener("change", renderAdmin);
-  $("#adminPanel").addEventListener("click", async e => {
-    const d = e.target.dataset;
-    if(d.cApprove) setCounselorStatus(d.cApprove, "approved");
-    else if(d.cReject) setCounselorStatus(d.cReject, "rejected");
-    else if(d.cRemove){ if(confirm("Permanently remove this counselor? This can't be undone.")){ counselors = await Store.remove("counselors", d.cRemove); refreshAll(); } }
-    else if(d.rRemove){ if(confirm("Permanently remove this request? This can't be undone.")){ requests = await Store.remove("requests", d.rRemove); refreshAll(); } }
-    else if(d.rCopy){
-      const url = confirmUrl(d.rCopy);
-      try{ await navigator.clipboard.writeText(url); e.target.textContent = "✓ Copied"; setTimeout(() => e.target.textContent = "Copy invite link", 1500); }
-      catch(x){ prompt("Copy this link and send it to the counselor:", url); }
-    }
-  });
-  $("#adminPanel").addEventListener("change", async e => {
-    const d = e.target.dataset;
-    const r = requests.find(x => x.id === (d.rStatus || d.rAssign)); if(!r) return;
-    if(d.rStatus){ r.status = e.target.value; await saveRequest(r, "Status → " + r.status); }
-    if(d.rAssign !== undefined){
-      const c = counselors.find(x => x.id === e.target.value);
-      r.counselorId = c ? c.id : null; r.counselorName = c ? c.name : null;
-      if(c && ["New","Matching"].includes(r.status)) r.status = "Awaiting counselor";
-      await saveRequest(r, c ? "Assigned to " + c.name : "Unassigned");
-    }
-  });
-
-  function toCSV(rows, cols){
+  /* ---- CSV exports ---- */
+  function toCSV(rows, cols) {
     const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
     return [cols.map(c => q(c[0])).join(","), ...rows.map(r => cols.map(c => q(c[1](r))).join(","))].join("\r\n");
   }
-  const j = a => (a||[]).join("; ");
-  $("#exportCounselorsBtn").addEventListener("click", () => download(toCSV(counselors, [
-    ["Name",c=>c.name],["Email",c=>c.email],["Phone",c=>c.phone],["Location",c=>c.location],["License Type",c=>c.licenseType],
-    ["License State",c=>c.licenseState],["License Number",c=>c.licenseNum],["Years",c=>c.years],["Expertise",c=>j(c.expertise)],
-    ["Audiences",c=>j(c.audiences)],["Session Formats",c=>j(c.eventTypes)],["Delivery",c=>j(c.formats)],["Availability",c=>j(c.availability)],
-    ["Timezone",c=>c.timezone],["Min Notice (days)",c=>c.leadTime],["Bio",c=>c.bio],["Website",c=>c.website],["Insurance Carrier",c=>c.insurance?.carrier],["Insurance Policy",c=>c.insurance?.policy],["Insurance Limits",c=>c.insurance?.limits],["Insurance Expires",c=>c.insurance?.expires],["Annual Commitment",c=>c.commitAnnual?"Yes":"No"],["Status",c=>c.status],["Date Added",c=>c.dateAdded]
-  ]), "c4c-counselors.csv", "text/csv"));
-  $("#exportRequestsBtn").addEventListener("click", () => download(toCSV(requests, [
-    ["Tracking ID",r=>r.trackingId],["Organization",r=>r.orgName],["Org Type",r=>r.orgType],["Contact",r=>r.contact],["Email",r=>r.email],["CC",r=>j(r.cc)],["New to C4C",r=>r.priorContact==="no"?"Yes":""],["Window",r=>fmtWindow(r)],["Ages",r=>r.ages],["Event Type",r=>r.eventType],
-    ["Duration (min)",r=>r.duration],["Delivery",r=>r.format],["Attendees",r=>r.attendees],["Timezone",r=>r.timezone],["Location",r=>r.location],
-    ["Proposed Times",r=>(r.proposedSlots||[]).map(s=>formatSlot(s,r.timezone)).join(" | ")],
-    ["Confirmed Time",r=>r.confirmedSlotIndex != null ? formatSlot(r.proposedSlots[r.confirmedSlotIndex], r.timezone) : ""],
-    ["Audiences",r=>j(r.audiences)],["Topics",r=>j(r.topics)],["Description",r=>r.description],["Support Level",r=>r.donation],
-    ["Counselor",r=>r.counselorName],["Status",r=>r.status],["Date Added",r=>r.dateAdded]
+  const j = a => (a || []).join("; ");
+  $("#exportProsBtn").addEventListener("click", () => download(toCSV(S.admin.professionals, [
+    ["Name", p => p.display_name], ["Email", p => p.email], ["Phone", p => (p.private || {}).phone], ["City/State", p => p.city_state],
+    ["License Type", p => p.license_type], ["License State", p => p.license_state], ["License Number", p => (p.private || {}).license_number],
+    ["Years Practicing", p => (p.private || {}).years_practicing], ["Expertise", p => j(p.expertise)], ["Audiences", p => j(p.audiences)],
+    ["Session Types", p => j(p.event_types)], ["Delivery", p => j(p.delivery)], ["Availability", p => j(p.availability)],
+    ["Min Notice (days)", p => (p.private || {}).min_notice_days], ["Website", p => p.website], ["Bio", p => p.bio],
+    ["Insurance Carrier", p => (p.private || {}).ins_carrier], ["Insurance Policy", p => (p.private || {}).ins_policy_number],
+    ["Insurance Limits", p => (p.private || {}).ins_limits], ["Insurance Expires", p => (p.private || {}).ins_expires],
+    ["Insurance Verified", p => (p.private || {}).ins_verified_at ? "Yes" : "No"], ["Will Present Yearly", p => (p.private || {}).commit_annual ? "Yes" : "No"],
+    ["Status", p => p.status], ["Joined", p => p.created_at], ["Approved", p => p.approved_at]
+  ]), "c4c-presenters.csv", "text/csv"));
+  $("#exportReqsBtn").addEventListener("click", () => download(toCSV(S.admin.requests, [
+    ["Tracking ID", r => r.tracking_id], ["Status", r => (OPT.STATUS[r.status] || {}).label], ["Organization", r => (r.organization || {}).name],
+    ["Org Type", r => (r.organization || {}).org_type], ["Lead", r => (r.organization || {}).lead_name], ["Lead Email", r => (r.organization || {}).lead_email],
+    ["Session Type", r => r.event_type], ["Window", r => fmtWindow(r)], ["Audiences", r => j(r.audiences)], ["Ages", r => r.age_range],
+    ["Expected Attendance", r => r.attendees_expected], ["Delivery", r => r.delivery], ["Length (min)", r => r.duration_min], ["Location", r => r.location],
+    ["Topics", r => j(r.topics)], ["Description", r => r.description], ["Support Level", r => r.support_level],
+    ["Requested Presenter", r => (r.requested || {}).display_name], ["Matched Presenter", r => (r.matched || {}).display_name],
+    ["Session Date", r => r.event ? fmtInstant(r.event.starts_at, r.timezone) : ""], ["Attendance", r => r.event ? r.event.attendance_actual : ""],
+    ["Presenter Hours", r => r.event ? r.event.presenter_hours : ""], ["Submitted", r => r.created_at]
   ]), "c4c-requests.csv", "text/csv"));
-  $("#exportJsonBtn").addEventListener("click", () => download(JSON.stringify({ exportedAt: new Date().toISOString(), counselors, requests }, null, 2), "c4c-portal-backup.json", "application/json"));
-  $("#resetBtn").addEventListener("click", async () => {
-    if(!confirm("Delete ALL draft counselors and requests stored in this browser? This can't be undone.")) return;
-    await Store.clear(); await load(); refreshAll();
+  $("#exportOrgsBtn").addEventListener("click", () => download(toCSV(S.admin.organizations, [
+    ["Organization", o => o.name], ["Type", o => o.org_type], ["Lead", o => o.lead_name], ["Lead Email", o => o.lead_email], ["CC", o => j(o.cc_emails)],
+    ["New to C4C", o => o.prior_contact === false ? "Yes" : o.prior_contact === true ? "No" : ""], ["Intro Call Offered", o => o.intro_call_offered_at], ["Joined", o => o.created_at]
+  ]), "c4c-organizations.csv", "text/csv"));
+  $("#exportJsonBtn").addEventListener("click", () => download(JSON.stringify(Object.assign({ exported_at: new Date().toISOString() }, S.admin), null, 2), "c4c-portal-backup.json", "application/json"));
+  async function seed() { await B.demo.seed(); await refresh(); toast("Sample data loaded. Open \"Find a Presenter\", or sign in as a sample account."); }
+  $("#adminSeedBtn").addEventListener("click", e => run(e.target, seed));
+  $("#seedBtn").addEventListener("click", e => run(e.target, seed));
+  $("#resetBtn").addEventListener("click", e => run(e.target, async () => {
+    if (!confirm("Delete ALL demo accounts, presenters and requests stored in this browser? This can't be undone.")) return;
+    await B.demo.reset(); S.suggestions = {}; await refresh(); toast("Demo data cleared."); go("home");
+  }));
+
+  /* ================= delegated actions ================= */
+  const findRequest = id => (S.admin ? S.admin.requests : []).concat(S.requests).find(r => r.id === id);
+  const ACTIONS = {
+    "request-presenter": async d => { S.target = d.id; go("request"); },
+    "view-presenter": async d => { $("#dirSearch").value = d.name; },
+    "seed": async () => seed(),
+    "demo-signin": async d => { await B.signIn({ email: d.email }); await refresh(); },
+    "respond": async d => {
+      const accept = d.accept === "1";
+      if (!accept && !confirm("Pass on this request? C4C will be told so another presenter can be found.")) return;
+      const status = await B.respond(d.id, accept);
+      await refresh();
+      toast(!accept ? "Thanks for letting us know." : status === "connected" ? "You're connected. Reach out to settle the date." : "Thanks! The organization will see that you're interested.");
+    },
+    "choose": async d => { await B.choosePresenter(d.id, d.pro); await refresh(); toast("You're connected. Reach out to your presenter to settle the date."); },
+    "cancel": async d => { if (!confirm("Cancel this request? Your presenter and C4C will be notified.")) return; await B.cancelRequest(d.id); await refresh(); toast("Request cancelled."); },
+    "ics": async d => downloadIcs(findRequest(d.id)),
+    "admin-suggest": async d => { S.suggestions[d.id] = await B.admin.suggest(d.id); renderAdmin(); },
+    "admin-invite": async d => {
+      const ids = $$(`input[data-suggest="${d.id}"]:checked:not(:disabled)`).map(i => i.value);
+      if (!ids.length) return toast("Tick at least one presenter to invite.", "error");
+      const n = await B.admin.invite(d.id, ids); delete S.suggestions[d.id]; await refresh();
+      toast(n ? `Invited ${n} presenter${n === 1 ? "" : "s"}.` : "Those presenters were already invited.");
+    },
+    "admin-assign": async d => {
+      if (!confirm(`Connect ${d.name} with this organization right away? Both sides will be introduced by email.`)) return;
+      await B.admin.assign(d.id, d.pro); delete S.suggestions[d.id]; await refresh(); toast("Assigned and connected.");
+    },
+    "admin-remove-request": async d => { if (!confirm("Permanently remove this request and its history? This can't be undone.")) return; await B.admin.removeRequest(d.id); await refresh(); toast("Request removed."); },
+    "pro-approve": async d => { await B.admin.setProfessionalStatus(d.id, "approved"); await refresh(); toast(`${d.name} is now live in the directory.`); },
+    "pro-reject": async d => { if (!confirm(`Mark ${d.name} as not approved? They stay out of the directory.`)) return; await B.admin.setProfessionalStatus(d.id, "rejected"); await refresh(); },
+    "pro-suspend": async d => { if (!confirm(`Pause ${d.name}? Their profile is hidden from the directory until you approve it again.`)) return; await B.admin.setProfessionalStatus(d.id, "suspended"); await refresh(); },
+    "ins-verify": async d => { await B.admin.setInsuranceVerified(d.id, true); await refresh(); },
+    "ins-unverify": async d => { await B.admin.setInsuranceVerified(d.id, false); await refresh(); },
+    "pro-remove": async d => { if (!confirm(`Permanently remove ${d.name}'s presenter profile? This can't be undone. Their sign-in stays.`)) return; await B.admin.removeProfessional(d.id); await refresh(); toast("Profile removed."); }
+  };
+  document.addEventListener("click", e => {
+    const el = e.target.closest("[data-act]");
+    if (!el || !ACTIONS[el.dataset.act]) return;
+    run(el.tagName === "BUTTON" ? el : null, () => ACTIONS[el.dataset.act](el.dataset));
   });
-  $("#adminSeedBtn").addEventListener("click", seed);
+  document.addEventListener("change", e => {
+    const el = e.target.closest('[data-change="admin-status"]');
+    if (el) run(el, async () => { await B.admin.setRequestStatus(el.dataset.id, el.value); await refresh(); });
+  });
+  document.addEventListener("submit", e => {
+    const f = e.target.closest("[data-form]");
+    if (f) {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(f)), btn = f.querySelector("[type=submit]");
+      if (f.dataset.form === "schedule") run(btn, async () => {
+        const starts = zonedToUtc(d.date, d.time, d.tz);
+        if (!(starts > new Date())) throw new Error("Choose a date and time in the future.");
+        await B.scheduleEvent(f.dataset.id, starts.toISOString(), parseInt(d.duration, 10) || 60, d.location || "");
+        await refresh(); toast("Date saved. Calendar links are ready on the request.");
+      });
+      if (f.dataset.form === "outcome") run(btn, async () => {
+        await B.recordOutcome(f.dataset.id, Math.max(0, parseInt(d.attendance, 10) || 0), Math.max(0, parseFloat(d.hours) || 0));
+        await refresh(); toast("Thank you! The session is marked complete.");
+      });
+      return;
+    }
+    if (e.target.id === "demoAdminForm") {
+      e.preventDefault();
+      const btn = e.target.querySelector("[type=submit]"); btn.disabled = true;
+      B.demo.unlockAdmin($("#demoPasscode").value).then(refresh)
+        .catch(err => { btn.disabled = false; showError("demoAdminError", err.message); });
+    }
+  });
 
-  /* ---------------- Sample data (draft only, clearly fictional) ---------------- */
-  async function seed(){
-    if(counselors.some(c => c.sample)) return alert("Sample counselors are already loaded.");
-    const base = { phone:"", years:"", timezone:"America/New_York", leadTime:"30", status:"approved", sample:true, licenseNum:"SAMPLE", insurance:{ carrier:"Sample Carrier", policy:"SAMPLE", limits:"$1M / $3M", expires:"2027-12-31" } };
-    const now = Date.now();
-    const samples = [
-      { name:"Sample Counselor A", location:"Melbourne, FL", licenseType:OPT.LICENSE_TYPES[2], licenseState:"FL", expertise:["Relationships & Family","Parenting Support","Youth & Adolescent Mental Health"], audiences:["Parents & Caregivers","Educators & School Staff"], eventTypes:["Workshop","Panel Discussion"], formats:["Virtual","In-person"], availability:["Weekday evenings","Saturday mornings"], bio:"Example profile for demo purposes. Family therapist who leads parent workshops on supporting teens through stress and big transitions." },
-      { name:"Sample Counselor B", location:"Orlando, FL", licenseType:OPT.LICENSE_TYPES[3], licenseState:"FL", expertise:["Anxiety & Stress","Suicide Prevention","Bullying & Social Media"], audiences:["K-12 Students","Educators & School Staff"], eventTypes:["Assembly / Keynote","Psychoeducation Session"], formats:["In-person"], availability:["Weekday mornings","Weekday afternoons"], bio:"Example profile for demo purposes. School-focused counselor offering age-appropriate assemblies on anxiety, coping skills and asking for help." },
-      { name:"Sample Counselor C", location:"Tampa, FL", licenseType:OPT.LICENSE_TYPES[4], licenseState:"FL", expertise:["Trauma & PTSD","Burnout & Workplace Stress","Crisis Response"], audiences:["First Responders","Healthcare Workers","Corporate / Workplace Groups"], eventTypes:["Staff Training","Workshop"], formats:["Virtual"], availability:["Weekday afternoons","Weekday evenings"], bio:"Example profile for demo purposes. Psychologist who trains first responders and clinical teams on trauma-informed care and burnout prevention." }
-    ].map((s, i) => ({ ...base, ...s, id: genId(), email: `sample${i+1}@example.org`, dateAdded: new Date(now - (3-i) * 86400000).toISOString() }));
-    counselors = counselors.concat(samples);
-    await Store.saveAll("counselors", counselors); refreshAll();
-  }
+  /* ================= boot ================= */
+  B.onAuth(async event => {
+    if (event === "PASSWORD_RECOVERY") S.recovery = true;
+    await refresh();
+    if (event === "PASSWORD_RECOVERY") return go("account");
+    if (event === "SIGNED_IN") await submitDraftIfAny();
+  });
 
-  /* ---------------- Boot ---------------- */
-  initUI();
-  load().then(() => { refreshAll(); route(); });
+  (async function boot() {
+    initUI();
+    // Links from confirmation and reset emails come back with details in the address; surface any error.
+    const hashErr = /error_description=([^&]+)/.exec(location.hash);
+    try { await B.init(); }
+    catch (e) { console.error(e); toast(e.message || "Could not start the sign-in service.", "error"); }
+    await refresh();
+    if (hashErr) {
+      toast(decodeURIComponent(hashErr[1].replace(/\+/g, " ")) + ". Please request a new link.", "error");
+      history.replaceState(null, "", location.pathname + "#account");
+    }
+    route();
+    await submitDraftIfAny();
+  })();
 })();
